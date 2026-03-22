@@ -4,6 +4,7 @@ import { BoardScene } from "./game/scenes/BoardScene";
 import type { GameState } from "./game/core/gameState";
 import { DebugPanel } from "./DebugPanel";
 import { GameHUD } from "./GameHUD";
+import { FightResultOverlay } from "./FightResultOverlay";
 
 const PHASER_CONFIG: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -61,6 +62,12 @@ export default function App() {
           onSelectSpell={handleSelectSpell}
           onEndTurn={handleEndTurn}
         />
+        {gameState && (
+          <FightResultOverlay
+            result={gameState.fightResult}
+            onRetry={handleReset}
+          />
+        )}
       </div>
       <DebugPanel
         state={gameState as any}

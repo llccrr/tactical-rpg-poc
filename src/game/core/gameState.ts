@@ -16,12 +16,15 @@ export interface Spell {
   name: string;
   range: number;
   cost: number; // PA cost
+  baseDamage: number;
 }
 
 export interface CharacterState {
   pos: GridPos;
   hp: number;
   maxHp: number;
+  attack: number;
+  defense: number;
   moveRange: number; // max PM per turn
   ap: number;        // max PA per turn
   selected: boolean;
@@ -38,6 +41,8 @@ export interface EnemyState {
   ap: number;
 }
 
+export type FightResult = "ongoing" | "victory" | "defeat";
+
 export interface GameState {
   tiles: TileType[][];
   character: CharacterState;
@@ -48,6 +53,7 @@ export interface GameState {
   turnNumber: number;
   remainingPM: number;
   remainingPA: number;
+  fightResult: FightResult;
 }
 
 /** Predefined obstacle positions for the POC */
@@ -79,10 +85,12 @@ export function createInitialState(): GameState {
       pos: { x: 4, y: 5 },
       hp: 30,
       maxHp: 30,
+      attack: 5,
+      defense: 2,
       moveRange: DEFAULT_MOVE_RANGE,
       ap: DEFAULT_AP,
       selected: true,
-      spells: [{ name: "Frappe", range: 5, cost: 3 }],
+      spells: [{ name: "Frappe", range: 5, cost: 3, baseDamage: 4 }],
     },
     enemies: [
       {
@@ -101,6 +109,7 @@ export function createInitialState(): GameState {
     turnNumber: 1,
     remainingPM: DEFAULT_MOVE_RANGE,
     remainingPA: DEFAULT_AP,
+    fightResult: "ongoing",
   };
 }
 

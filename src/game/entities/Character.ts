@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import { TILE_WIDTH, TILE_HEIGHT, MOVE_STEP_DURATION } from "../config";
 import { gridToScreen } from "../core/iso";
 import type { GridPos } from "../core/grid";
+import { HpBar } from "./HpBar";
 
 /** Cube dimensions in isometric projection */
 const CUBE_W = TILE_WIDTH * 0.45;   // width of the cube footprint
@@ -47,6 +48,7 @@ export class Character extends Phaser.GameObjects.Graphics {
   private _selected = false;
   public isMoving = false;
   private colors: CharacterColors;
+  private hpBar: HpBar;
 
   constructor(scene: Phaser.Scene, gridPos: GridPos, colors: CharacterColors = PLAYER_COLORS) {
     super(scene);
@@ -57,6 +59,9 @@ export class Character extends Phaser.GameObjects.Graphics {
     this.setPosition(screen.x, screen.y);
     this.setDepth(10);
     this.draw();
+
+    this.hpBar = new HpBar(scene);
+    this.hpBar.syncPosition(screen.x, screen.y);
 
     // Hit area: a rectangle covering the cube for easy clicking
     const hitW = CUBE_W + 4;
@@ -76,6 +81,16 @@ export class Character extends Phaser.GameObjects.Graphics {
   set selected(value: boolean) {
     this._selected = value;
     this.draw();
+  }
+
+  /** Update the HP bar display */
+  updateHp(hp: number, maxHp: number): void {
+    this.hpBar.updateHp(hp, maxHp);
+  }
+
+  override destroy(fromScene?: boolean): void {
+    this.hpBar.destroy(fromScene);
+    super.destroy(fromScene);
   }
 
   /** Animate movement along a path with smooth acceleration/deceleration */
@@ -103,8 +118,12 @@ export class Character extends Phaser.GameObjects.Graphics {
           y: target.y,
           duration: MOVE_STEP_DURATION,
           ease,
+          onUpdate: () => {
+            this.hpBar.syncPosition(this.x, this.y);
+          },
           onComplete: () => {
             this.gridPos = { ...path[i] };
+            this.hpBar.syncPosition(this.x, this.y);
             resolve();
           },
         });

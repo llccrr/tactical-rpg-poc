@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { GRID_COLS, GRID_ROWS } from "../config";
-import { posKey, manhattan } from "../core/grid";
+import { posKey } from "../core/grid";
 import type { GridPos } from "../core/grid";
 import {
   createInitialState,
@@ -8,17 +8,16 @@ import {
   TileType,
   ActionMode,
   type GameState,
-  type EnemyState,
-  type Spell,
 } from "../core/gameState";
 import { computeDamage } from "../core/combat";
-import { TurnManager } from "../core/turnManager";
+import { FightController } from "../core/fightController";
+import { CombatEventBus } from "../core/events";
+import { decideEnemyMove, decideEnemyAttack } from "../core/ai";
 import { getReachableTiles, findPath } from "../core/pathfinding";
 import { Tile } from "../entities/Tile";
 import { Character, ENEMY_COLORS } from "../entities/Character";
-
-/** Default melee attack used by enemies */
-const ENEMY_MELEE: Spell = { name: "Attaque", range: 1, cost: 3, baseDamage: 3 };
+import { showDamagePopup } from "../entities/DamagePopup";
+import { gridToScreen } from "../core/iso";
 
 /** Callback shape for pushing state updates to React */
 export type OnStateChange = (state: GameState) => void;
@@ -27,11 +26,14 @@ export class BoardScene extends Phaser.Scene {
   private state!: GameState;
   private tileMap = new Map<string, Tile>();
   private character!: Character;
-  private enemySprites: Character[] = [];
+  private enemySprites = new Map<string, Character>();
   private reachableKeys = new Set<string>();
   private spellRangeKeys = new Set<string>();
   private onStateChange?: OnStateChange;
-  private hoveredEnemy: number | null = null;
+  private hoveredEnemyId: string | null = null;
+
+  private fight!: FightController;
+  private eventBus!: CombatEventBus;
 
   constructor() {
     super({ key: "BoardScene" });
@@ -43,11 +45,10 @@ export class BoardScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.state = createInitialState();
+    this.initFight();
     this.buildBoard();
     this.character = this.createPlayerCharacter();
     this.createEnemySprites();
-
     this.showReachable();
     this.emitState();
   }
@@ -57,13 +58,14 @@ export class BoardScene extends Phaser.Scene {
     this.tileMap.forEach((t) => t.destroy());
     this.tileMap.clear();
     this.character.destroy();
-    this.enemySprites.forEach((e) => e.destroy());
-    this.enemySprites = [];
+    this.enemySprites.forEach((s) => s.destroy());
+    this.enemySprites.clear();
     this.reachableKeys.clear();
     this.spellRangeKeys.clear();
-    this.hoveredEnemy = null;
+    this.hoveredEnemyId = null;
+    this.eventBus.clear();
 
-    this.state = createInitialState();
+    this.initFight();
     this.buildBoard();
     this.character = this.createPlayerCharacter();
     this.createEnemySprites();
@@ -74,14 +76,12 @@ export class BoardScene extends Phaser.Scene {
   /** Called from React when a spell button is clicked */
   selectSpell(index: number): void {
     if (this.state.fightResult !== "ongoing") return;
-    if (!TurnManager.isPlayerTurn(this.state)) return;
+    if (!this.fight.isPlayerTurn()) return;
     if (this.character.isMoving) return;
 
     const spell = this.state.character.spells[index];
     if (!spell) return;
-
-    // Not enough PA
-    if (!TurnManager.canPlayerAfford(this.state, spell.cost)) return;
+    if (!this.fight.canPlayerAfford(spell.cost)) return;
 
     // Toggle: clicking the same spell again goes back to move mode
     if (
@@ -105,27 +105,33 @@ export class BoardScene extends Phaser.Scene {
   /** Called from React when End Turn button is clicked */
   endTurn(): void {
     if (this.state.fightResult !== "ongoing") return;
-    if (!TurnManager.isPlayerTurn(this.state)) return;
+    if (!this.fight.isPlayerTurn()) return;
 
     this.clearReachable();
     this.clearSpellRange();
     this.state.actionMode = ActionMode.Move;
     this.state.activeSpellIndex = null;
 
-    TurnManager.endPlayerTurn(this.state);
+    this.fight.endPlayerTurn();
     this.emitState();
 
-    // Run enemy turn after a short delay
-    this.time.delayedCall(500, () => this.runEnemyTurn());
+    // Run enemy turns after a short delay
+    this.time.delayedCall(500, () => this.runEnemyPhase());
   }
 
   // ── internal ──────────────────────────────────────────────
+
+  private initFight(): void {
+    this.state = createInitialState();
+    this.eventBus = new CombatEventBus();
+    this.fight = new FightController(this.state, this.eventBus);
+  }
 
   private createPlayerCharacter(): Character {
     const char = new Character(this, this.state.character.pos);
     char.selected = true;
     char.on("pointerdown", () => {
-      if (!TurnManager.isPlayerTurn(this.state)) return;
+      if (!this.fight.isPlayerTurn()) return;
       if (char.isMoving) return;
       this.switchToMoveMode();
     });
@@ -133,25 +139,26 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private createEnemySprites(): void {
-    for (let i = 0; i < this.state.enemies.length; i++) {
-      const enemy = this.state.enemies[i];
+    for (const enemy of this.state.enemies) {
       const sprite = new Character(this, enemy.pos, ENEMY_COLORS);
+      const id = enemy.id;
 
       sprite.on("pointerover", () => {
-        this.hoveredEnemy = i;
+        this.hoveredEnemyId = id;
         this.emitState();
       });
       sprite.on("pointerout", () => {
-        if (this.hoveredEnemy === i) {
-          this.hoveredEnemy = null;
+        if (this.hoveredEnemyId === id) {
+          this.hoveredEnemyId = null;
           this.emitState();
         }
       });
       sprite.on("pointerdown", () => {
-        this.handleTileClick(enemy.pos);
+        const e = this.state.enemies.find((en) => en.id === id);
+        if (e) this.handleTileClick(e.pos);
       });
 
-      this.enemySprites.push(sprite);
+      this.enemySprites.set(id, sprite);
     }
   }
 
@@ -160,20 +167,20 @@ export class BoardScene extends Phaser.Scene {
     this.state.actionMode = ActionMode.Move;
     this.state.activeSpellIndex = null;
 
-    if (TurnManager.canPlayerMove(this.state)) {
+    if (this.fight.canPlayerMove()) {
       this.showReachable();
     }
     this.emitState();
   }
 
-  /** Refresh highlights based on current state (PM left, action mode, etc.) */
+  /** Refresh highlights based on current state */
   private refreshHighlights(): void {
     this.clearReachable();
     this.clearSpellRange();
 
     if (this.state.actionMode === ActionMode.Targeting) {
       this.showSpellRange();
-    } else if (TurnManager.canPlayerMove(this.state)) {
+    } else if (this.fight.canPlayerMove()) {
       this.showReachable();
     }
   }
@@ -196,10 +203,9 @@ export class BoardScene extends Phaser.Scene {
 
   private showReachable(): void {
     this.clearReachable();
-    if (!TurnManager.canPlayerMove(this.state)) return;
+    if (!this.fight.canPlayerMove()) return;
 
     const blocked = getBlockedSet(this.state);
-    // Use remainingPM instead of full moveRange
     const reachable = getReachableTiles(
       this.state.character.pos,
       this.state.remainingPM,
@@ -250,7 +256,7 @@ export class BoardScene extends Phaser.Scene {
 
   private async handleTileClick(pos: GridPos): Promise<void> {
     if (this.state.fightResult !== "ongoing") return;
-    if (!TurnManager.isPlayerTurn(this.state)) return;
+    if (!this.fight.isPlayerTurn()) return;
     if (this.character.isMoving) return;
 
     const key = posKey(pos);
@@ -259,20 +265,16 @@ export class BoardScene extends Phaser.Scene {
     if (this.state.actionMode === ActionMode.Targeting) {
       if (!this.spellRangeKeys.has(key)) return;
 
-      const enemyIndex = this.state.enemies.findIndex(
-        (e) => posKey(e.pos) === key,
-      );
-      if (enemyIndex === -1) return;
+      const enemy = this.state.enemies.find((e) => posKey(e.pos) === key);
+      if (!enemy) return;
 
       const spell = this.state.character.spells[this.state.activeSpellIndex!];
       if (!spell) return;
-      if (!TurnManager.canPlayerAfford(this.state, spell.cost)) return;
+      if (!this.fight.canPlayerAfford(spell.cost)) return;
 
-      // Spend PA
-      TurnManager.spendPA(this.state, spell.cost);
+      this.fight.spendPA(spell.cost);
 
       // Compute and apply damage
-      const enemy = this.state.enemies[enemyIndex];
       const { damage, killed } = computeDamage(
         this.state.character,
         enemy,
@@ -281,18 +283,33 @@ export class BoardScene extends Phaser.Scene {
       );
       enemy.hp -= damage;
 
-      // Handle enemy death or flash feedback
+      // Emit damage event
+      this.eventBus.emit({
+        type: "damage",
+        attackerId: "player",
+        targetId: enemy.id,
+        damage,
+        spell: spell.name,
+      });
+
+      // Visual feedback
+      const enemySprite = this.enemySprites.get(enemy.id);
+      if (enemySprite) {
+        const screen = gridToScreen(enemy.pos);
+        showDamagePopup(this, screen.x, screen.y, damage);
+      }
+
       if (killed) {
-        this.removeEnemy(enemyIndex);
-      } else {
-        const enemySprite = this.enemySprites[enemyIndex];
+        this.eventBus.emit({ type: "death", entityId: enemy.id });
+        this.removeEnemy(enemy.id);
+      } else if (enemySprite) {
         enemySprite.selected = true;
         this.time.delayedCall(200, () => {
           enemySprite.selected = false;
         });
       }
 
-      // Go back to move mode and refresh what's available
+      // Go back to move mode
       this.state.actionMode = ActionMode.Move;
       this.state.activeSpellIndex = null;
       this.refreshHighlights();
@@ -302,115 +319,110 @@ export class BoardScene extends Phaser.Scene {
     }
 
     // ── Move mode: move to reachable tile ──
-    if (!TurnManager.canPlayerMove(this.state)) return;
+    if (!this.fight.canPlayerMove()) return;
     if (!this.reachableKeys.has(key)) return;
 
     const blocked = getBlockedSet(this.state);
     const path = findPath(this.state.character.pos, pos, blocked);
     if (!path || path.length === 0) return;
-
-    // Check we have enough PM for this path
     if (path.length > this.state.remainingPM) return;
 
-    // Clear highlights before moving
     this.clearReachable();
     this.emitState();
 
-    // Animate movement
     await this.character.moveAlongPath(this, path);
 
-    // Deduct PM and update position
-    TurnManager.spendPM(this.state, path.length);
+    this.fight.spendPM(path.length);
     this.state.character.pos = { ...pos };
 
-    // Re-show reachable with remaining PM
     this.refreshHighlights();
     this.emitState();
   }
 
-  /** Simple enemy AI: move toward the player, attack if adjacent, then end turn */
-  private async runEnemyTurn(): Promise<void> {
-    for (let i = 0; i < this.state.enemies.length; i++) {
-      const enemy = this.state.enemies[i];
-      const sprite = this.enemySprites[i];
+  /** Run all enemy turns sequentially */
+  private async runEnemyPhase(): Promise<void> {
+    // Snapshot IDs at start of phase (safe against mid-loop removal)
+    const enemyIds = this.fight.getLivingEnemyIds();
 
-      // Build blocked set excluding this enemy so it can move
-      const blocked = getBlockedSet(this.state);
-      blocked.delete(posKey(enemy.pos));
-      // Also block the player position
-      blocked.add(posKey(this.state.character.pos));
+    for (const id of enemyIds) {
+      const enemy = this.state.enemies.find((e) => e.id === id);
+      if (!enemy) continue; // already dead
 
-      // Find reachable tiles for this enemy
-      const reachable = getReachableTiles(
-        enemy.pos,
-        enemy.moveRange,
-        blocked,
-      );
+      const sprite = this.enemySprites.get(id);
+      if (!sprite) continue;
 
-      // Pick the tile closest to the player
-      let bestKey: string | null = null;
-      let bestDist = Infinity;
-      const playerPos = this.state.character.pos;
+      this.eventBus.emit({
+        type: "turnStart",
+        entityId: id,
+        turnNumber: this.state.turnNumber,
+      });
 
-      for (const [tileKey] of reachable) {
-        const [tx, ty] = tileKey.split(",").map(Number);
-        const dist =
-          Math.abs(tx - playerPos.x) + Math.abs(ty - playerPos.y);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestKey = tileKey;
+      // AI: decide movement
+      const moveDecision = decideEnemyMove(enemy, this.state);
+      if (moveDecision) {
+        await sprite.moveAlongPath(this, moveDecision.path);
+        enemy.pos = { ...moveDecision.target };
+      }
+
+      // AI: decide attack
+      const spell = decideEnemyAttack(enemy, this.state.character.pos);
+      if (spell) {
+        const { damage } = computeDamage(
+          enemy,
+          this.state.character,
+          spell,
+          this.state.character.hp,
+        );
+        this.state.character.hp -= damage;
+
+        this.eventBus.emit({
+          type: "damage",
+          attackerId: id,
+          targetId: "player",
+          damage,
+          spell: spell.name,
+        });
+
+        // Visual feedback
+        const playerScreen = gridToScreen(this.state.character.pos);
+        showDamagePopup(this, playerScreen.x, playerScreen.y, damage);
+
+        this.character.selected = false;
+        this.time.delayedCall(200, () => {
+          this.character.selected = true;
+        });
+
+        this.checkFightEnd();
+        if (this.state.fightResult !== "ongoing") {
+          this.emitState();
+          return;
         }
       }
 
-      if (bestKey) {
-        const [tx, ty] = bestKey.split(",").map(Number);
-        const target: GridPos = { x: tx, y: ty };
-        const path = findPath(enemy.pos, target, blocked);
-
-        if (path && path.length > 0) {
-          await sprite.moveAlongPath(this, path);
-          enemy.pos = { ...target };
-        }
-      }
-
-      // Attack if adjacent to player (manhattan ≤ 1)
-      if (manhattan(enemy.pos, playerPos) <= 1) {
-        this.enemyAttack(enemy);
-        if (this.state.fightResult !== "ongoing") break;
-      }
-
+      this.eventBus.emit({ type: "turnEnd", entityId: id });
       this.emitState();
     }
 
-    if (this.state.fightResult !== "ongoing") return;
-
-    // Enemy turn done — back to player with full PM/PA
-    TurnManager.endEnemyTurn(this.state);
+    // Enemy phase done — back to player
+    this.fight.endEnemyPhase();
     this.refreshHighlights();
     this.emitState();
   }
 
-  /** Enemy attacks the player with a basic melee hit */
-  private enemyAttack(enemy: EnemyState): void {
-    const { damage } = computeDamage(enemy, this.state.character, ENEMY_MELEE, this.state.character.hp);
-    this.state.character.hp -= damage;
-
-    // Flash player
-    this.character.selected = false;
-    this.time.delayedCall(200, () => {
-      this.character.selected = true;
-    });
-
-    this.checkFightEnd();
-  }
-
   /** Remove a dead enemy from state and scene */
-  private removeEnemy(index: number): void {
-    this.state.enemies.splice(index, 1);
-    const sprite = this.enemySprites.splice(index, 1)[0];
-    sprite.destroy();
-    // Reset hovered enemy since indices shifted
-    this.hoveredEnemy = null;
+  private removeEnemy(id: string): void {
+    const index = this.state.enemies.findIndex((e) => e.id === id);
+    if (index !== -1) this.state.enemies.splice(index, 1);
+
+    const sprite = this.enemySprites.get(id);
+    if (sprite) {
+      sprite.destroy();
+      this.enemySprites.delete(id);
+    }
+
+    if (this.hoveredEnemyId === id) {
+      this.hoveredEnemyId = null;
+    }
   }
 
   /** Check if fight is over (victory or defeat) */
@@ -418,22 +430,24 @@ export class BoardScene extends Phaser.Scene {
     if (this.state.character.hp <= 0) {
       this.state.character.hp = 0;
       this.state.fightResult = "defeat";
+      this.eventBus.emit({ type: "fightEnd", result: "defeat" });
     } else if (this.state.enemies.length === 0) {
       this.state.fightResult = "victory";
+      this.eventBus.emit({ type: "fightEnd", result: "victory" });
     }
   }
 
   /** Sync all HP bar visuals with current state */
   private syncHpBars(): void {
     this.character.updateHp(this.state.character.hp, this.state.character.maxHp);
-    for (let i = 0; i < this.state.enemies.length; i++) {
-      const enemy = this.state.enemies[i];
-      this.enemySprites[i]?.updateHp(enemy.hp, enemy.maxHp);
+    for (const enemy of this.state.enemies) {
+      this.enemySprites.get(enemy.id)?.updateHp(enemy.hp, enemy.maxHp);
     }
   }
 
   private emitState(): void {
     this.syncHpBars();
+    this.fight.syncLog();
     this.onStateChange?.({
       ...this.state,
       character: {
@@ -444,8 +458,10 @@ export class BoardScene extends Phaser.Scene {
       enemies: this.state.enemies.map((e) => ({
         ...e,
         pos: { ...e.pos },
+        spells: [...e.spells],
       })),
-      hoveredEnemy: this.hoveredEnemy,
-    } as GameState & { hoveredEnemy: number | null });
+      combatLog: [...this.state.combatLog],
+      hoveredEnemyId: this.hoveredEnemyId,
+    } as GameState & { hoveredEnemyId: string | null });
   }
 }

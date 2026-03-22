@@ -1,6 +1,7 @@
 import type { GridPos } from "./grid";
 import { posKey } from "./grid";
 import { GRID_COLS, GRID_ROWS, DEFAULT_MOVE_RANGE, DEFAULT_AP } from "../config";
+import type { CombatEvent } from "./events";
 
 export enum TileType {
   Empty = "empty",
@@ -32,6 +33,8 @@ export interface CharacterState {
 }
 
 export interface EnemyState {
+  id: string;
+  name: string;
   pos: GridPos;
   hp: number;
   maxHp: number;
@@ -39,6 +42,7 @@ export interface EnemyState {
   defense: number;
   moveRange: number;
   ap: number;
+  spells: Spell[];
 }
 
 export type FightResult = "ongoing" | "victory" | "defeat";
@@ -54,6 +58,7 @@ export interface GameState {
   remainingPM: number;
   remainingPA: number;
   fightResult: FightResult;
+  combatLog: CombatEvent[];
 }
 
 /** Predefined obstacle positions for the POC */
@@ -94,13 +99,40 @@ export function createInitialState(): GameState {
     },
     enemies: [
       {
+        id: "gobelin",
+        name: "Gobelin",
         pos: { x: 7, y: 2 },
-        hp: 10,
-        maxHp: 10,
+        hp: 8,
+        maxHp: 8,
+        attack: 2,
+        defense: 0,
+        moveRange: 4,
+        ap: DEFAULT_AP,
+        spells: [{ name: "Griffe", range: 1, cost: 3, baseDamage: 3 }],
+      },
+      {
+        id: "squelette",
+        name: "Squelette",
+        pos: { x: 2, y: 1 },
+        hp: 12,
+        maxHp: 12,
         attack: 3,
         defense: 1,
         moveRange: DEFAULT_MOVE_RANGE,
         ap: DEFAULT_AP,
+        spells: [{ name: "Os tranchant", range: 1, cost: 3, baseDamage: 4 }],
+      },
+      {
+        id: "slime",
+        name: "Slime",
+        pos: { x: 8, y: 7 },
+        hp: 20,
+        maxHp: 20,
+        attack: 2,
+        defense: 3,
+        moveRange: 2,
+        ap: DEFAULT_AP,
+        spells: [{ name: "Ecrasement", range: 1, cost: 3, baseDamage: 2 }],
       },
     ],
     actionMode: ActionMode.Move,
@@ -110,10 +142,11 @@ export function createInitialState(): GameState {
     remainingPM: DEFAULT_MOVE_RANGE,
     remainingPA: DEFAULT_AP,
     fightResult: "ongoing",
+    combatLog: [],
   };
 }
 
-/** Collect all blocked tile keys (obstacles + character position) */
+/** Collect all blocked tile keys (obstacles + enemy positions) */
 export function getBlockedSet(state: GameState): Set<string> {
   const blocked = new Set<string>();
 
@@ -125,7 +158,6 @@ export function getBlockedSet(state: GameState): Set<string> {
     }
   }
 
-  // Block enemy positions so the player can't walk through them
   for (const enemy of state.enemies) {
     blocked.add(posKey(enemy.pos));
   }

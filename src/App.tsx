@@ -5,6 +5,7 @@ import type { GameState } from "./game/core/gameState";
 import { DebugPanel } from "./DebugPanel";
 import { GameHUD } from "./GameHUD";
 import { FightResultOverlay } from "./FightResultOverlay";
+import { CombatLog } from "./CombatLog";
 
 const PHASER_CONFIG: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -57,6 +58,7 @@ export default function App() {
     <div style={{ display: "flex", height: "100vh" }}>
       <div style={{ flex: 1, position: "relative" }}>
         <div id="phaser-container" style={{ width: "100%", height: "100%" }} />
+        <CombatLog state={gameState} />
         <GameHUD
           state={gameState}
           onSelectSpell={handleSelectSpell}

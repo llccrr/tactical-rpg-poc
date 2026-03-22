@@ -2,7 +2,7 @@ import type { GameState, EnemyState } from "./game/core/gameState";
 import { ActionMode } from "./game/core/gameState";
 
 interface DebugPanelProps {
-  state: (GameState & { hoveredEnemy: number | null }) | null;
+  state: (GameState & { hoveredEnemyId: string | null }) | null;
   onReset: () => void;
   onSelectSpell: (index: number) => void;
   onEndTurn: () => void;
@@ -19,7 +19,9 @@ export function DebugPanel({
   const { character } = state;
   const isPlayerTurn = state.currentTurn === "player";
   const hoveredEnemy: EnemyState | null =
-    state.hoveredEnemy != null ? state.enemies[state.hoveredEnemy] : null;
+    state.hoveredEnemyId != null
+      ? state.enemies.find((e) => e.id === state.hoveredEnemyId) ?? null
+      : null;
 
   return (
     <div
@@ -168,7 +170,7 @@ export function DebugPanel({
       {/* Enemy info on hover */}
       {hoveredEnemy && (
         <>
-          <h3 style={{ margin: "8px 0 0", color: "#5566ee" }}>Ennemi</h3>
+          <h3 style={{ margin: "8px 0 0", color: "#5566ee" }}>{hoveredEnemy.name}</h3>
           <div>
             <strong>Position:</strong> ({hoveredEnemy.pos.x},{" "}
             {hoveredEnemy.pos.y})

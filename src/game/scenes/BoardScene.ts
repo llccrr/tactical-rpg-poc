@@ -9,12 +9,16 @@ import {
   ActionMode,
   type GameState,
   type EnemyState,
+  type Spell,
 } from "../core/gameState";
 import { computeDamage } from "../core/combat";
 import { TurnManager } from "../core/turnManager";
 import { getReachableTiles, findPath } from "../core/pathfinding";
 import { Tile } from "../entities/Tile";
 import { Character, ENEMY_COLORS } from "../entities/Character";
+
+/** Default melee attack used by enemies */
+const ENEMY_MELEE: Spell = { name: "Attaque", range: 1, cost: 3, baseDamage: 3 };
 
 /** Callback shape for pushing state updates to React */
 export type OnStateChange = (state: GameState) => void;
@@ -277,16 +281,15 @@ export class BoardScene extends Phaser.Scene {
       );
       enemy.hp -= damage;
 
-      // Flash the enemy to give feedback
-      const enemySprite = this.enemySprites[enemyIndex];
-      enemySprite.selected = true;
-      this.time.delayedCall(200, () => {
-        enemySprite.selected = false;
-      });
-
-      // Handle enemy death
+      // Handle enemy death or flash feedback
       if (killed) {
         this.removeEnemy(enemyIndex);
+      } else {
+        const enemySprite = this.enemySprites[enemyIndex];
+        enemySprite.selected = true;
+        this.time.delayedCall(200, () => {
+          enemySprite.selected = false;
+        });
       }
 
       // Go back to move mode and refresh what's available
@@ -389,14 +392,7 @@ export class BoardScene extends Phaser.Scene {
 
   /** Enemy attacks the player with a basic melee hit */
   private enemyAttack(enemy: EnemyState): void {
-    const meleeSpell: import("../core/gameState").Spell = {
-      name: "Attaque",
-      range: 1,
-      cost: 3,
-      baseDamage: 3,
-    };
-
-    const { damage } = computeDamage(enemy, this.state.character, meleeSpell, this.state.character.hp);
+    const { damage } = computeDamage(enemy, this.state.character, ENEMY_MELEE, this.state.character.hp);
     this.state.character.hp -= damage;
 
     // Flash player
@@ -413,6 +409,8 @@ export class BoardScene extends Phaser.Scene {
     this.state.enemies.splice(index, 1);
     const sprite = this.enemySprites.splice(index, 1)[0];
     sprite.destroy();
+    // Reset hovered enemy since indices shifted
+    this.hoveredEnemy = null;
   }
 
   /** Check if fight is over (victory or defeat) */

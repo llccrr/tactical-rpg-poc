@@ -6,19 +6,19 @@
 - Introduire un mode "ciblage" séparé du mode "déplacement" (enum `ActionMode`)
 - Afficher un panneau de sorts dans le UI React
 
-## 2. Ennemi
-- Créer un `EnemyState` dans `gameState.ts` (position, HP, stats)
-- Réutiliser la classe `Character` avec une couleur différente
-- Ajouter la position de l'ennemi au `blockedSet` pour empêcher le chevauchement
-- Afficher les infos ennemi au survol dans le DebugPanel
+## 2. ~~Ennemi~~ ✅
+- ~~Créer un `EnemyState` dans `gameState.ts` (position, HP, stats)~~
+- ~~Réutiliser la classe `Character` avec une couleur différente~~
+- ~~Ajouter la position de l'ennemi au `blockedSet` pour empêcher le chevauchement~~
+- ~~Afficher les infos ennemi au survol dans le DebugPanel~~
 
-## 3. Tour par tour
-- Introduire un `TurnManager` dans `core/` qui gère les phases :
-  - `move` → `action` → `end turn`
-- State `currentTurn: 'player' | 'enemy'`
-- Bloquer les inputs pendant le tour ennemi
-- Ajouter un bouton "End Turn" dans le UI React
-- Timeline visuelle des tours
+## 3. ~~Tour par tour~~ ✅
+- ~~Introduire un `TurnManager` dans `core/` qui gère les phases :~~
+  - ~~`move` → `action` → `end turn`~~
+- ~~State `currentTurn: 'player' | 'enemy'`~~
+- ~~Bloquer les inputs pendant le tour ennemi~~
+- ~~Ajouter un bouton "End Turn" dans le UI React~~
+- Timeline visuelle des tours (à améliorer)
 
 ## 4. IA basique
 - L'ennemi utilise le même BFS pour se rapprocher du joueur

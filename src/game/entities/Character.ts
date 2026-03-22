@@ -8,7 +8,17 @@ const CUBE_W = TILE_WIDTH * 0.45;   // width of the cube footprint
 const CUBE_H = TILE_HEIGHT * 0.45;  // depth of the cube footprint (iso)
 const CUBE_ELEVATION = 20;          // cube height in pixels
 
-const COLORS = {
+export interface CharacterColors {
+  top: number;
+  left: number;
+  right: number;
+  topSelected: number;
+  leftSelected: number;
+  rightSelected: number;
+  stroke: number;
+}
+
+const PLAYER_COLORS: CharacterColors = {
   top:    0xee5533,
   left:   0xbb3322,
   right:  0xdd4428,
@@ -16,20 +26,32 @@ const COLORS = {
   leftSelected:   0xcc8833,
   rightSelected:  0xdd9938,
   stroke: 0xffffff,
-} as const;
+};
+
+export const ENEMY_COLORS: CharacterColors = {
+  top:    0x5566ee,
+  left:   0x3344bb,
+  right:  0x4455dd,
+  topSelected:    0x77aaff,
+  leftSelected:   0x5588dd,
+  rightSelected:  0x6699ee,
+  stroke: 0xffffff,
+};
 
 /**
- * Player character rendered as a small isometric cube,
- * centered on its tile.
+ * Character rendered as a small isometric cube,
+ * centered on its tile. Used for both player and enemies.
  */
 export class Character extends Phaser.GameObjects.Graphics {
   public gridPos: GridPos;
   private _selected = false;
   public isMoving = false;
+  private colors: CharacterColors;
 
-  constructor(scene: Phaser.Scene, gridPos: GridPos) {
+  constructor(scene: Phaser.Scene, gridPos: GridPos, colors: CharacterColors = PLAYER_COLORS) {
     super(scene);
 
+    this.colors = colors;
     this.gridPos = gridPos;
     const screen = gridToScreen(gridPos);
     this.setPosition(screen.x, screen.y);
@@ -100,13 +122,14 @@ export class Character extends Phaser.GameObjects.Graphics {
     const hh = CUBE_H / 2;   // half-height (iso depth)
     const el = CUBE_ELEVATION;
 
-    const top   = this._selected ? COLORS.topSelected   : COLORS.top;
-    const left  = this._selected ? COLORS.leftSelected  : COLORS.left;
-    const right = this._selected ? COLORS.rightSelected : COLORS.right;
+    const c = this.colors;
+    const top   = this._selected ? c.topSelected   : c.top;
+    const left  = this._selected ? c.leftSelected  : c.left;
+    const right = this._selected ? c.rightSelected : c.right;
 
     // -- Top face (diamond) --
     this.fillStyle(top, 1);
-    this.lineStyle(1.5, COLORS.stroke, 0.5);
+    this.lineStyle(1.5, c.stroke, 0.5);
     this.beginPath();
     this.moveTo(0, -el - hh);       // north
     this.lineTo(hw, -el);            // east
@@ -118,7 +141,7 @@ export class Character extends Phaser.GameObjects.Graphics {
 
     // -- Left face --
     this.fillStyle(left, 1);
-    this.lineStyle(1.5, COLORS.stroke, 0.3);
+    this.lineStyle(1.5, c.stroke, 0.3);
     this.beginPath();
     this.moveTo(-hw, -el);           // top-left
     this.lineTo(0, -el + hh);       // top-right (south of top face)
@@ -130,7 +153,7 @@ export class Character extends Phaser.GameObjects.Graphics {
 
     // -- Right face --
     this.fillStyle(right, 1);
-    this.lineStyle(1.5, COLORS.stroke, 0.3);
+    this.lineStyle(1.5, c.stroke, 0.3);
     this.beginPath();
     this.moveTo(hw, -el);            // top-right
     this.lineTo(0, -el + hh);       // top-left (south of top face)

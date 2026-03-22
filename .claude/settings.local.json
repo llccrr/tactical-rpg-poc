@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(wc -l /home/loic/dev/tactical-rpg-poc/src/**/*.ts /home/loic/dev/tactical-rpg-poc/src/**/*.tsx)"
     ]
   }
 }

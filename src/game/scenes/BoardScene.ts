@@ -9,9 +9,10 @@ import {
   ActionMode,
   type GameState,
 } from "../core/gameState";
+import { TurnManager } from "../core/turnManager";
 import { getReachableTiles, findPath } from "../core/pathfinding";
 import { Tile } from "../entities/Tile";
-import { Character } from "../entities/Character";
+import { Character, ENEMY_COLORS } from "../entities/Character";
 
 /** Callback shape for pushing state updates to React */
 export type OnStateChange = (state: GameState) => void;
@@ -20,9 +21,11 @@ export class BoardScene extends Phaser.Scene {
   private state!: GameState;
   private tileMap = new Map<string, Tile>();
   private character!: Character;
+  private enemySprites: Character[] = [];
   private reachableKeys = new Set<string>();
   private spellRangeKeys = new Set<string>();
   private onStateChange?: OnStateChange;
+  private hoveredEnemy: number | null = null;
 
   constructor() {
     super({ key: "BoardScene" });
@@ -36,16 +39,9 @@ export class BoardScene extends Phaser.Scene {
   create(): void {
     this.state = createInitialState();
     this.buildBoard();
-    this.character = new Character(this, this.state.character.pos);
-    this.character.selected = true;
+    this.character = this.createPlayerCharacter();
+    this.createEnemySprites();
 
-    // Character click → back to move mode
-    this.character.on("pointerdown", () => {
-      if (this.character.isMoving) return;
-      this.switchToMoveMode();
-    });
-
-    // Auto-show movement range
     this.showReachable();
     this.emitState();
   }
@@ -55,24 +51,30 @@ export class BoardScene extends Phaser.Scene {
     this.tileMap.forEach((t) => t.destroy());
     this.tileMap.clear();
     this.character.destroy();
+    this.enemySprites.forEach((e) => e.destroy());
+    this.enemySprites = [];
     this.reachableKeys.clear();
     this.spellRangeKeys.clear();
+    this.hoveredEnemy = null;
 
     this.state = createInitialState();
     this.buildBoard();
-    this.character = new Character(this, this.state.character.pos);
-    this.character.selected = true;
-    this.character.on("pointerdown", () => {
-      if (this.character.isMoving) return;
-      this.switchToMoveMode();
-    });
+    this.character = this.createPlayerCharacter();
+    this.createEnemySprites();
     this.showReachable();
     this.emitState();
   }
 
   /** Called from React when a spell button is clicked */
   selectSpell(index: number): void {
+    if (!TurnManager.isPlayerTurn(this.state)) return;
     if (this.character.isMoving) return;
+
+    const spell = this.state.character.spells[index];
+    if (!spell) return;
+
+    // Not enough PA
+    if (!TurnManager.canPlayerAfford(this.state, spell.cost)) return;
 
     // Toggle: clicking the same spell again goes back to move mode
     if (
@@ -93,14 +95,76 @@ export class BoardScene extends Phaser.Scene {
     this.emitState();
   }
 
+  /** Called from React when End Turn button is clicked */
+  endTurn(): void {
+    if (!TurnManager.isPlayerTurn(this.state)) return;
+
+    this.clearReachable();
+    this.clearSpellRange();
+    this.state.actionMode = ActionMode.Move;
+    this.state.activeSpellIndex = null;
+
+    TurnManager.endPlayerTurn(this.state);
+    this.emitState();
+
+    // Run enemy turn after a short delay
+    this.time.delayedCall(500, () => this.runEnemyTurn());
+  }
+
   // ── internal ──────────────────────────────────────────────
+
+  private createPlayerCharacter(): Character {
+    const char = new Character(this, this.state.character.pos);
+    char.selected = true;
+    char.on("pointerdown", () => {
+      if (!TurnManager.isPlayerTurn(this.state)) return;
+      if (char.isMoving) return;
+      this.switchToMoveMode();
+    });
+    return char;
+  }
+
+  private createEnemySprites(): void {
+    for (let i = 0; i < this.state.enemies.length; i++) {
+      const enemy = this.state.enemies[i];
+      const sprite = new Character(this, enemy.pos, ENEMY_COLORS);
+
+      sprite.on("pointerover", () => {
+        this.hoveredEnemy = i;
+        this.emitState();
+      });
+      sprite.on("pointerout", () => {
+        if (this.hoveredEnemy === i) {
+          this.hoveredEnemy = null;
+          this.emitState();
+        }
+      });
+
+      this.enemySprites.push(sprite);
+    }
+  }
 
   private switchToMoveMode(): void {
     this.clearSpellRange();
     this.state.actionMode = ActionMode.Move;
     this.state.activeSpellIndex = null;
-    this.showReachable();
+
+    if (TurnManager.canPlayerMove(this.state)) {
+      this.showReachable();
+    }
     this.emitState();
+  }
+
+  /** Refresh highlights based on current state (PM left, action mode, etc.) */
+  private refreshHighlights(): void {
+    this.clearReachable();
+    this.clearSpellRange();
+
+    if (this.state.actionMode === ActionMode.Targeting) {
+      this.showSpellRange();
+    } else if (TurnManager.canPlayerMove(this.state)) {
+      this.showReachable();
+    }
   }
 
   private buildBoard(): void {
@@ -121,10 +185,13 @@ export class BoardScene extends Phaser.Scene {
 
   private showReachable(): void {
     this.clearReachable();
+    if (!TurnManager.canPlayerMove(this.state)) return;
+
     const blocked = getBlockedSet(this.state);
+    // Use remainingPM instead of full moveRange
     const reachable = getReachableTiles(
       this.state.character.pos,
-      this.state.character.moveRange,
+      this.state.remainingPM,
       blocked,
     );
 
@@ -167,19 +234,52 @@ export class BoardScene extends Phaser.Scene {
   }
 
   private async handleTileClick(pos: GridPos): Promise<void> {
+    if (!TurnManager.isPlayerTurn(this.state)) return;
     if (this.character.isMoving) return;
 
     const key = posKey(pos);
 
-    // In targeting mode, clicking a tile in range does nothing yet (no enemies)
-    if (this.state.actionMode === ActionMode.Targeting) return;
+    // ── Targeting mode: cast spell on enemy ──
+    if (this.state.actionMode === ActionMode.Targeting) {
+      if (!this.spellRangeKeys.has(key)) return;
 
-    // Move mode: only move to reachable tiles
+      const enemyIndex = this.state.enemies.findIndex(
+        (e) => posKey(e.pos) === key,
+      );
+      if (enemyIndex === -1) return;
+
+      const spell = this.state.character.spells[this.state.activeSpellIndex!];
+      if (!spell) return;
+      if (!TurnManager.canPlayerAfford(this.state, spell.cost)) return;
+
+      // Spend PA
+      TurnManager.spendPA(this.state, spell.cost);
+
+      // Flash the enemy to give feedback
+      const enemySprite = this.enemySprites[enemyIndex];
+      enemySprite.selected = true;
+      this.time.delayedCall(200, () => {
+        enemySprite.selected = false;
+      });
+
+      // Go back to move mode and refresh what's available
+      this.state.actionMode = ActionMode.Move;
+      this.state.activeSpellIndex = null;
+      this.refreshHighlights();
+      this.emitState();
+      return;
+    }
+
+    // ── Move mode: move to reachable tile ──
+    if (!TurnManager.canPlayerMove(this.state)) return;
     if (!this.reachableKeys.has(key)) return;
 
     const blocked = getBlockedSet(this.state);
     const path = findPath(this.state.character.pos, pos, blocked);
     if (!path || path.length === 0) return;
+
+    // Check we have enough PM for this path
+    if (path.length > this.state.remainingPM) return;
 
     // Clear highlights before moving
     this.clearReachable();
@@ -188,9 +288,64 @@ export class BoardScene extends Phaser.Scene {
     // Animate movement
     await this.character.moveAlongPath(this, path);
 
-    // Update logical state and re-show movement range
+    // Deduct PM and update position
+    TurnManager.spendPM(this.state, path.length);
     this.state.character.pos = { ...pos };
-    this.showReachable();
+
+    // Re-show reachable with remaining PM
+    this.refreshHighlights();
+    this.emitState();
+  }
+
+  /** Simple enemy AI: move toward the player, then end turn */
+  private async runEnemyTurn(): Promise<void> {
+    for (let i = 0; i < this.state.enemies.length; i++) {
+      const enemy = this.state.enemies[i];
+      const sprite = this.enemySprites[i];
+
+      // Build blocked set excluding this enemy so it can move
+      const blocked = getBlockedSet(this.state);
+      blocked.delete(posKey(enemy.pos));
+      // Also block the player position
+      blocked.add(posKey(this.state.character.pos));
+
+      // Find reachable tiles for this enemy
+      const reachable = getReachableTiles(
+        enemy.pos,
+        enemy.moveRange,
+        blocked,
+      );
+
+      // Pick the tile closest to the player
+      let bestKey: string | null = null;
+      let bestDist = Infinity;
+      const playerPos = this.state.character.pos;
+
+      for (const [tileKey] of reachable) {
+        const [tx, ty] = tileKey.split(",").map(Number);
+        const dist =
+          Math.abs(tx - playerPos.x) + Math.abs(ty - playerPos.y);
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestKey = tileKey;
+        }
+      }
+
+      if (bestKey) {
+        const [tx, ty] = bestKey.split(",").map(Number);
+        const target: GridPos = { x: tx, y: ty };
+        const path = findPath(enemy.pos, target, blocked);
+
+        if (path && path.length > 0) {
+          await sprite.moveAlongPath(this, path);
+          enemy.pos = { ...target };
+        }
+      }
+    }
+
+    // Enemy turn done — back to player with full PM/PA
+    TurnManager.endEnemyTurn(this.state);
+    this.refreshHighlights();
     this.emitState();
   }
 
@@ -202,6 +357,11 @@ export class BoardScene extends Phaser.Scene {
         pos: { ...this.state.character.pos },
         spells: [...this.state.character.spells],
       },
-    });
+      enemies: this.state.enemies.map((e) => ({
+        ...e,
+        pos: { ...e.pos },
+      })),
+      hoveredEnemy: this.hoveredEnemy,
+    } as GameState & { hoveredEnemy: number | null });
   }
 }

@@ -7,8 +7,11 @@ export const GRID_ROWS = 10;
 export const TILE_WIDTH = 64;
 export const TILE_HEIGHT = 32;
 
-/** Default movement range (in tiles) */
+/** Default movement points per turn */
 export const DEFAULT_MOVE_RANGE = 3;
+
+/** Default action points per turn */
+export const DEFAULT_AP = 6;
 
 /** Board origin offset so the grid is centered on screen */
 export const BOARD_ORIGIN_X = 512;

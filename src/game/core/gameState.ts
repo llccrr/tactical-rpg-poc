@@ -1,6 +1,6 @@
 import type { GridPos } from "./grid";
 import { posKey } from "./grid";
-import { GRID_COLS, GRID_ROWS, DEFAULT_MOVE_RANGE } from "../config";
+import { GRID_COLS, GRID_ROWS, DEFAULT_MOVE_RANGE, DEFAULT_AP } from "../config";
 
 export enum TileType {
   Empty = "empty",
@@ -15,20 +15,39 @@ export enum ActionMode {
 export interface Spell {
   name: string;
   range: number;
+  cost: number; // PA cost
 }
 
 export interface CharacterState {
   pos: GridPos;
-  moveRange: number;
+  hp: number;
+  maxHp: number;
+  moveRange: number; // max PM per turn
+  ap: number;        // max PA per turn
   selected: boolean;
   spells: Spell[];
+}
+
+export interface EnemyState {
+  pos: GridPos;
+  hp: number;
+  maxHp: number;
+  attack: number;
+  defense: number;
+  moveRange: number;
+  ap: number;
 }
 
 export interface GameState {
   tiles: TileType[][];
   character: CharacterState;
+  enemies: EnemyState[];
   actionMode: ActionMode;
   activeSpellIndex: number | null;
+  currentTurn: "player" | "enemy";
+  turnNumber: number;
+  remainingPM: number;
+  remainingPA: number;
 }
 
 /** Predefined obstacle positions for the POC */
@@ -58,12 +77,30 @@ export function createInitialState(): GameState {
     tiles,
     character: {
       pos: { x: 4, y: 5 },
+      hp: 30,
+      maxHp: 30,
       moveRange: DEFAULT_MOVE_RANGE,
+      ap: DEFAULT_AP,
       selected: true,
-      spells: [{ name: "Frappe", range: 5 }],
+      spells: [{ name: "Frappe", range: 5, cost: 3 }],
     },
+    enemies: [
+      {
+        pos: { x: 7, y: 2 },
+        hp: 10,
+        maxHp: 10,
+        attack: 3,
+        defense: 1,
+        moveRange: DEFAULT_MOVE_RANGE,
+        ap: DEFAULT_AP,
+      },
+    ],
     actionMode: ActionMode.Move,
     activeSpellIndex: null,
+    currentTurn: "player",
+    turnNumber: 1,
+    remainingPM: DEFAULT_MOVE_RANGE,
+    remainingPA: DEFAULT_AP,
   };
 }
 
@@ -79,8 +116,10 @@ export function getBlockedSet(state: GameState): Set<string> {
     }
   }
 
-  // The character's own tile is walkable (it's the origin) but we don't
-  // want other entities to share it — for now we skip it since there's
-  // only one character.
+  // Block enemy positions so the player can't walk through them
+  for (const enemy of state.enemies) {
+    blocked.add(posKey(enemy.pos));
+  }
+
   return blocked;
 }

@@ -3,9 +3,10 @@ import type { FightResult } from "./game/core/gameState";
 interface Props {
   result: FightResult;
   onRetry: () => void;
+  onBackToMenu: () => void;
 }
 
-export function FightResultOverlay({ result, onRetry }: Props) {
+export function FightResultOverlay({ result, onRetry, onBackToMenu }: Props) {
   if (result === "ongoing") return null;
 
   const isVictory = result === "victory";
@@ -35,25 +36,46 @@ export function FightResultOverlay({ result, onRetry }: Props) {
       >
         {isVictory ? "Victoire !" : "Defaite..."}
       </h1>
-      <button
-        onClick={onRetry}
-        style={{
-          padding: "12px 32px",
-          fontSize: "1.1rem",
-          fontWeight: "bold",
-          color: "#fff",
-          backgroundColor: isVictory ? "#2a8a2a" : "#8a2a2a",
-          border: "2px solid " + (isVictory ? "#44cc44" : "#cc3333"),
-          borderRadius: "8px",
-          cursor: "pointer",
-          fontFamily: "sans-serif",
-          transition: "transform 0.1s",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-      >
-        Rejouer
-      </button>
+      <div style={{ display: "flex", gap: 16 }}>
+        <button
+          onClick={onRetry}
+          style={{
+            padding: "12px 32px",
+            fontSize: "1.1rem",
+            fontWeight: "bold",
+            color: "#fff",
+            backgroundColor: isVictory ? "#2a8a2a" : "#8a2a2a",
+            border: "2px solid " + (isVictory ? "#44cc44" : "#cc3333"),
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontFamily: "sans-serif",
+            transition: "transform 0.1s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        >
+          Rejouer
+        </button>
+        <button
+          onClick={onBackToMenu}
+          style={{
+            padding: "12px 32px",
+            fontSize: "1.1rem",
+            fontWeight: "bold",
+            color: "#fff",
+            backgroundColor: "#333",
+            border: "2px solid #888",
+            borderRadius: "8px",
+            cursor: "pointer",
+            fontFamily: "sans-serif",
+            transition: "transform 0.1s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        >
+          Changer de classe
+        </button>
+      </div>
     </div>
   );
 }

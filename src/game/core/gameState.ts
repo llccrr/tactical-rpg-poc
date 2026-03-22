@@ -2,6 +2,7 @@ import type { GridPos } from "./grid";
 import { posKey } from "./grid";
 import { GRID_COLS, GRID_ROWS, DEFAULT_MOVE_RANGE, DEFAULT_AP } from "../config";
 import type { CombatEvent } from "./events";
+import { getClassById } from "../data/classes";
 
 export enum TileType {
   Empty = "empty",
@@ -74,8 +75,11 @@ const OBSTACLE_POSITIONS: GridPos[] = [
   { x: 1, y: 4 },
 ];
 
-/** Create the initial game state */
-export function createInitialState(): GameState {
+/** Create the initial game state based on chosen class */
+export function createInitialState(classId: string): GameState {
+  const classDef = getClassById(classId);
+  if (!classDef) throw new Error(`Unknown class: ${classId}`);
+
   const tiles: TileType[][] = Array.from({ length: GRID_ROWS }, () =>
     Array.from({ length: GRID_COLS }, () => TileType.Empty),
   );
@@ -88,14 +92,14 @@ export function createInitialState(): GameState {
     tiles,
     character: {
       pos: { x: 4, y: 5 },
-      hp: 30,
-      maxHp: 30,
-      attack: 5,
-      defense: 2,
-      moveRange: DEFAULT_MOVE_RANGE,
-      ap: DEFAULT_AP,
+      hp: classDef.baseHp,
+      maxHp: classDef.baseHp,
+      attack: classDef.baseAttack,
+      defense: classDef.baseDefense,
+      moveRange: classDef.basePm,
+      ap: classDef.basePa,
       selected: true,
-      spells: [{ name: "Frappe", range: 5, cost: 3, baseDamage: 4 }],
+      spells: [...classDef.spells],
     },
     enemies: [
       {
@@ -139,8 +143,8 @@ export function createInitialState(): GameState {
     activeSpellIndex: null,
     currentTurn: "player",
     turnNumber: 1,
-    remainingPM: DEFAULT_MOVE_RANGE,
-    remainingPA: DEFAULT_AP,
+    remainingPM: classDef.basePm,
+    remainingPA: classDef.basePa,
     fightResult: "ongoing",
     combatLog: [],
   };

@@ -34,6 +34,7 @@ export class BoardScene extends Phaser.Scene {
 
   private fight!: FightController;
   private eventBus!: CombatEventBus;
+  private classId = "bretteur";
 
   constructor() {
     super({ key: "BoardScene" });
@@ -42,6 +43,17 @@ export class BoardScene extends Phaser.Scene {
   /** Allow React to subscribe to state changes */
   setOnStateChange(cb: OnStateChange): void {
     this.onStateChange = cb;
+  }
+
+  /** Set classId before scene starts */
+  setClassId(classId: string): void {
+    this.classId = classId;
+  }
+
+  /** Start a fight with the given class — called from React */
+  startFight(classId: string): void {
+    this.classId = classId;
+    this.resetBoard();
   }
 
   create(): void {
@@ -122,7 +134,7 @@ export class BoardScene extends Phaser.Scene {
   // ── internal ──────────────────────────────────────────────
 
   private initFight(): void {
-    this.state = createInitialState();
+    this.state = createInitialState(this.classId);
     this.eventBus = new CombatEventBus();
     this.fight = new FightController(this.state, this.eventBus);
   }

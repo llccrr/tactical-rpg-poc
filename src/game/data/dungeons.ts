@@ -115,6 +115,48 @@ export const DUNGEONS: DungeonDef[] = [
       { resourceId: "noyau_slime", weight: 2 },
     ],
   },
+  {
+    id: "forteresse_demoniaque",
+    name: "Forteresse Demoniaque",
+    description: "Une forteresse de basalte baignee de flammes. Les demons y regnent en maitres absolus.",
+    tier: 3,
+    rooms: [
+      {
+        enemies: [
+          { defId: "demon", pos: { x: 7, y: 2 } },
+          { defId: "demon", pos: { x: 2, y: 1 } },
+          { defId: "demon_sorcier", pos: { x: 5, y: 1 } },
+        ],
+      },
+      {
+        enemies: [
+          { defId: "demon_garde", pos: { x: 4, y: 2 } },
+          { defId: "demon_sorcier", pos: { x: 8, y: 1 } },
+          { defId: "demon", pos: { x: 7, y: 4 } },
+        ],
+      },
+      {
+        enemies: [
+          { defId: "demon_garde", pos: { x: 3, y: 2 } },
+          { defId: "demon", pos: { x: 7, y: 3 } },
+          { defId: "demon_sorcier", pos: { x: 8, y: 1 } },
+          { defId: "demon", pos: { x: 1, y: 4 } },
+        ],
+      },
+      {
+        enemies: [
+          { defId: "archidemon", pos: { x: 5, y: 2 } },
+          { defId: "demon_garde", pos: { x: 3, y: 3 } },
+          { defId: "demon_sorcier", pos: { x: 7, y: 1 } },
+        ],
+      },
+    ],
+    lootTable: [
+      { resourceId: "corne_demon", weight: 5 },
+      { resourceId: "flamme_infernale", weight: 3 },
+      { resourceId: "coeur_demon", weight: 2 },
+    ],
+  },
 ];
 
 export function getDungeonById(id: string): DungeonDef | undefined {

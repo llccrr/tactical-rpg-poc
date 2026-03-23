@@ -17,6 +17,10 @@ export const RESOURCES: ResourceDef[] = [
   { id: "glu_slime", name: "Glu de Slime", icon: "💧" },
   { id: "cristal_visqueux", name: "Cristal visqueux", icon: "🔮" },
   { id: "noyau_slime", name: "Noyau de Slime", icon: "⚡" },
+  // Donjon 4 : Forteresse Demoniaque
+  { id: "corne_demon", name: "Corne de Demon", icon: "🐏" },
+  { id: "flamme_infernale", name: "Flamme infernale", icon: "🔥" },
+  { id: "coeur_demon", name: "Coeur de Demon", icon: "♥️" },
 ];
 
 export function getResourceById(id: string): ResourceDef | undefined {

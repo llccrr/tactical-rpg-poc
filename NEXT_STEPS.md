@@ -8,7 +8,7 @@
 | 1 | Classes | Sélection de classe, 2 classes jouables | ✅ Done |
 | 2 | Donjon & Loot | Salles enchaînées, ressources droppées | ✅ Done |
 | 3 | Craft & Équipement | Items craftables qui boostent les stats | ✅ Done |
-| 4 | Progression & Contenu | Tiers de difficulté, boss, nouvelles classes | ⏳ À venir |
+| 4 | Progression & Contenu | Tiers de difficulté, boss, IA variée | ✅ Done |
 | 5 | Co-op Duo | 2 joueurs local puis réseau | ⏳ À venir |
 | 6 | Polish & Meta | Sauvegarde, hub visuel, sons, équilibrage | ⏳ À venir |
 
@@ -48,17 +48,20 @@ Permettre au joueur de crafter du stuff à partir des ressources accumulées, et
 
 ---
 
-## Phase 4 — Progression & Contenu
+## Phase 4 — Progression & Contenu ✅
 
-### Objectif
-Élargir le contenu pour créer une vraie boucle long terme.
-
-### À implémenter
-1. **Tiers de difficulté** : Tier 1 (débutant) → Tier 3 (difficile), donjons verrouillés selon stuff
-2. **Ennemis variés** : comportements distincts (mêlée, ranged, tankeur)
-3. **Boss de donjon** : IA enrichie, sorts spéciaux
-4. **2 nouvelles classes** (ex: Mage, Paladin) dans `src/game/data/classes.ts`
-5. **Regen partielle** entre certaines salles
+### Livré
+- **IA par comportement** : 4 archétypes (melee, ranged, tank, boss) dans `src/game/core/ai.ts`
+  - Melee : fonce sur le joueur
+  - Ranged : garde ses distances, kite (attaque puis fuit avec les PM restants)
+  - Tank : se positionne entre le joueur et les alliés fragiles
+  - Boss : choisit le sort le plus dévastateur, se repositionne à distance idéale
+- **Boss enrichis** : sorts multiples (2-3 sorts), sélection intelligente du meilleur sort
+- **Donjon Tier 3 — Forteresse Démoniaque** (4 salles) dans `src/game/data/dungeons.ts`
+  - 4 nouveaux ennemis : Démon (melee), Démon Sorcier (ranged), Démon Garde (tank), Archidémon (boss)
+  - 3 nouvelles ressources : Corne de Démon, Flamme infernale, Coeur de Démon
+  - 3 nouveaux items T3 : Lame Démoniaque (+10 ATK), Cuirasse Infernale (+6 DEF +10 PV), Pendentif du Démon (+4 ATK +3 DEF +8 PV)
+- **13 ennemis** au total (contre 9 avant), tous avec un behavior assigné
 
 ---
 

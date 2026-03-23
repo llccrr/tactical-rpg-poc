@@ -14,7 +14,7 @@ import { computeDamage } from "../core/combat";
 import type { StatBonuses } from "../data/items";
 import { FightController } from "../core/fightController";
 import { CombatEventBus } from "../core/events";
-import { decideEnemyMove, decideEnemyAttack } from "../core/ai";
+import { decideEnemyMove, decideEnemyAttack, decideEnemyFlee } from "../core/ai";
 import { getReachableTiles, findPath } from "../core/pathfinding";
 import { Tile } from "../entities/Tile";
 import { Character, ENEMY_COLORS } from "../entities/Character";
@@ -390,6 +390,7 @@ export class BoardScene extends Phaser.Scene {
 
       // AI: decide movement
       const moveDecision = decideEnemyMove(enemy, this.state);
+      const pmUsed = moveDecision ? moveDecision.path.length : 0;
       if (moveDecision) {
         await sprite.moveAlongPath(this, moveDecision.path);
         enemy.pos = { ...moveDecision.target };
@@ -427,6 +428,16 @@ export class BoardScene extends Phaser.Scene {
         if (this.state.fightResult !== "ongoing") {
           this.emitState();
           return;
+        }
+      }
+
+      // AI: ranged kiting — flee with remaining PM after attacking
+      if (enemy.behavior === "ranged" && spell) {
+        const remainingPM = enemy.moveRange - pmUsed;
+        const fleeDecision = decideEnemyFlee(enemy, this.state, remainingPM);
+        if (fleeDecision) {
+          await sprite.moveAlongPath(this, fleeDecision.path);
+          enemy.pos = { ...fleeDecision.target };
         }
       }
 

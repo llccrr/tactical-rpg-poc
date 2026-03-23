@@ -104,6 +104,46 @@ export const ITEMS: ItemDef[] = [
     ],
     description: "+2 Attaque, +2 Défense, +5 PV",
   },
+  // ── Tier 3 ──────────────────────────────────────────────────
+  {
+    id: "lame_demoniaque",
+    name: "Lame Démoniaque",
+    icon: "🔥",
+    slot: "arme",
+    tier: 3,
+    bonuses: { attack: 10 },
+    recipe: [
+      { resourceId: "corne_demon", qty: 2 },
+      { resourceId: "flamme_infernale", qty: 1 },
+    ],
+    description: "+10 Attaque",
+  },
+  {
+    id: "cuirasse_infernale",
+    name: "Cuirasse Infernale",
+    icon: "🛡️",
+    slot: "armure",
+    tier: 3,
+    bonuses: { defense: 6, hp: 10 },
+    recipe: [
+      { resourceId: "flamme_infernale", qty: 2 },
+      { resourceId: "coeur_demon", qty: 1 },
+    ],
+    description: "+6 Défense, +10 PV",
+  },
+  {
+    id: "pendentif_demon",
+    name: "Pendentif du Démon",
+    icon: "🔮",
+    slot: "accessoire",
+    tier: 3,
+    bonuses: { attack: 4, defense: 3, hp: 8 },
+    recipe: [
+      { resourceId: "coeur_demon", qty: 1 },
+      { resourceId: "corne_demon", qty: 2 },
+    ],
+    description: "+4 Attaque, +3 Défense, +8 PV",
+  },
 ];
 
 export function getItemById(id: string): ItemDef | undefined {

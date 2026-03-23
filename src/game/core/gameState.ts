@@ -47,6 +47,7 @@ export interface EnemyState {
   moveRange: number;
   ap: number;
   spells: Spell[];
+  behavior: "melee" | "ranged" | "tank" | "boss";
 }
 
 export type FightResult = "ongoing" | "victory" | "defeat";

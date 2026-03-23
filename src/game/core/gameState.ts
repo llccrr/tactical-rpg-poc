@@ -6,6 +6,7 @@ import { getClassById } from "../data/classes";
 import { makeEnemy } from "../data/enemies";
 import type { RoomDef } from "../data/dungeons";
 import type { StatBonuses } from "../data/items";
+import type { IopLikeState } from "./ioplike";
 
 export enum TileType {
   Empty = "empty",
@@ -20,8 +21,16 @@ export enum ActionMode {
 export interface Spell {
   name: string;
   range: number;
-  cost: number; // PA cost
+  cost: number; // PA cost (0 if uses other resource)
   baseDamage: number;
+  // IopLike extended fields
+  rangeMin?: number;
+  bloodPointCost?: number;
+  mpCost?: number;
+  element?: string;
+  tags?: string[];
+  spellDefId?: string; // link to SpellDefinition in ioplike system
+  description?: string; // tooltip text for the player
 }
 
 export interface CharacterState {
@@ -64,6 +73,8 @@ export interface GameState {
   remainingPA: number;
   fightResult: FightResult;
   combatLog: CombatEvent[];
+  /** IopLike class-specific combat state (only set when playing IopLike) */
+  ioplikeState?: IopLikeState;
 }
 
 /** Config for a single dungeon room — overrides default enemies and optionally player HP */

@@ -5,7 +5,10 @@ export type CombatEvent =
   | { type: "death"; entityId: string }
   | { type: "turnStart"; entityId: string; turnNumber: number }
   | { type: "turnEnd"; entityId: string }
-  | { type: "fightEnd"; result: FightResult };
+  | { type: "fightEnd"; result: FightResult }
+  | { type: "info"; message: string }
+  | { type: "combo"; comboName: string; reward: string }
+  | { type: "concentration"; entityId: string; amount: number; total: number };
 
 export type CombatEventListener = (event: CombatEvent) => void;
 

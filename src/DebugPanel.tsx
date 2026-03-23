@@ -134,6 +134,48 @@ export function DebugPanel({
         </div>
       </div>
 
+      {/* IopLike resources */}
+      {state.ioplikeState && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+          <div>
+            <strong style={{ color: "#f59e0b" }}>Concentration</strong>{" "}
+            {state.ioplikeState.concentration} / {state.ioplikeState.concentrationMax}
+          </div>
+          <div
+            style={{
+              height: 8,
+              background: "#222",
+              borderRadius: 4,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                width: `${(state.ioplikeState.concentration / state.ioplikeState.concentrationMax) * 100}%`,
+                height: "100%",
+                background: "linear-gradient(90deg, #f59e0b, #f97316)",
+                borderRadius: 4,
+                transition: "width 0.2s",
+              }}
+            />
+          </div>
+          <div>
+            <strong style={{ color: "#ef4444" }}>Pts de sang</strong>{" "}
+            {state.ioplikeState.bloodPoints} / {state.ioplikeState.bloodPointsMax}
+          </div>
+          {state.ioplikeState.courroux > 0 && (
+            <div style={{ color: "#f97316" }}>
+              Courroux x{state.ioplikeState.courroux}
+            </div>
+          )}
+          {state.ioplikeState.preparation > 0 && (
+            <div style={{ color: "#a855f7" }}>
+              Préparation active
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Spell bar */}
       <h3 style={{ margin: "8px 0 0", color: "#4488ee" }}>Sorts</h3>
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -141,8 +183,19 @@ export function DebugPanel({
           const isActive =
             state.actionMode === ActionMode.Targeting &&
             state.activeSpellIndex === i;
-          const canAfford = state.remainingPA >= spell.cost;
+          const isBlood = (spell.bloodPointCost ?? 0) > 0;
+          const isMp = (spell.mpCost ?? 0) > 0;
+          const canAfford = isBlood
+            ? (state.ioplikeState?.bloodPoints ?? 0) >= spell.bloodPointCost!
+            : isMp
+              ? state.remainingPM >= spell.mpCost!
+              : state.remainingPA >= spell.cost;
           const disabled = !isPlayerTurn || !canAfford;
+          const costLabel = isBlood
+            ? `${spell.bloodPointCost} PS`
+            : isMp
+              ? `${spell.mpCost} PM`
+              : `${spell.cost} PA`;
           return (
             <button
               key={i}
@@ -159,7 +212,21 @@ export function DebugPanel({
                 textAlign: "left",
               }}
             >
-              {spell.name} ({spell.range} PO) — {spell.cost} PA
+              {spell.name} — {costLabel}
+              {spell.description && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: "#999",
+                    fontWeight: "normal",
+                    marginTop: 3,
+                    whiteSpace: "pre-line",
+                    lineHeight: 1.3,
+                  }}
+                >
+                  {spell.description}
+                </div>
+              )}
             </button>
           );
         })}

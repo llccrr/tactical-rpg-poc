@@ -27,6 +27,16 @@ export class FightController {
     return this.isPlayerTurn() && this.state.remainingPA >= paCost;
   }
 
+  /** Add PA (e.g. from combo reward or finisher kill) */
+  addPA(amount: number): void {
+    this.state.remainingPA += amount;
+  }
+
+  /** Get current remaining PA */
+  getRemainingPA(): number {
+    return this.state.remainingPA;
+  }
+
   /** Deduct PM after a move. Returns false if not enough PM. */
   spendPM(cost: number): boolean {
     if (cost > this.state.remainingPM) return false;

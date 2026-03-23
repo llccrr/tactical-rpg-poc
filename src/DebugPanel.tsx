@@ -18,7 +18,19 @@ export function DebugPanel({
   onWinFight,
   onLoseFight,
 }: DebugPanelProps) {
-  if (!state) return null;
+  if (!state) {
+    return (
+      <div
+        style={{
+          width: 220,
+          flexShrink: 0,
+          padding: 16,
+          background: "#0e0e1a",
+          borderLeft: "1px solid #333",
+        }}
+      />
+    );
+  }
 
   const { character } = state;
   const isPlayerTurn = state.currentTurn === "player";
@@ -31,6 +43,7 @@ export function DebugPanel({
     <div
       style={{
         width: 220,
+        flexShrink: 0,
         padding: 16,
         background: "#0e0e1a",
         color: "#ccc",

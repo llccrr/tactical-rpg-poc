@@ -22,7 +22,9 @@
       "Bash(node test-debug2.mjs)",
       "Bash(curl -s http://localhost:5173/src/App.tsx)",
       "Bash(node -e \":*)",
-      "Bash(ls -la /Users/llccrr/dev/tactical-rpg-poc/src/App.*)"
+      "Bash(ls -la /Users/llccrr/dev/tactical-rpg-poc/src/App.*)",
+      "Bash(/tmp/check_resources.txt:*)",
+      "Read(//tmp/**)"
     ]
   }
 }

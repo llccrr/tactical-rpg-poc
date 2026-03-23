@@ -5,6 +5,7 @@ import type { CombatEvent } from "./events";
 import { getClassById } from "../data/classes";
 import { makeEnemy } from "../data/enemies";
 import type { RoomDef } from "../data/dungeons";
+import type { StatBonuses } from "../data/items";
 
 export enum TileType {
   Empty = "empty",
@@ -85,7 +86,7 @@ const OBSTACLE_POSITIONS: GridPos[] = [
 ];
 
 /** Create the initial game state based on chosen class and optional room config */
-export function createInitialState(classId: string, roomConfig?: RoomConfig): GameState {
+export function createInitialState(classId: string, roomConfig?: RoomConfig, bonuses?: StatBonuses): GameState {
   const classDef = getClassById(classId);
   if (!classDef) throw new Error(`Unknown class: ${classId}`);
 
@@ -97,7 +98,8 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig): Ga
     tiles[obs.y][obs.x] = TileType.Obstacle;
   }
 
-  const startHp = roomConfig?.playerHp ?? classDef.baseHp;
+  const maxHp = classDef.baseHp + (bonuses?.hp ?? 0);
+  const startHp = roomConfig?.playerHp ?? maxHp;
 
   const enemies = roomConfig
     ? roomConfig.room.enemies.map((e, i) => makeEnemy(e.defId, e.pos, String(i)))
@@ -112,9 +114,9 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig): Ga
     character: {
       pos: { x: 4, y: 5 },
       hp: startHp,
-      maxHp: classDef.baseHp,
-      attack: classDef.baseAttack,
-      defense: classDef.baseDefense,
+      maxHp,
+      attack: classDef.baseAttack + (bonuses?.attack ?? 0),
+      defense: classDef.baseDefense + (bonuses?.defense ?? 0),
       moveRange: classDef.basePm,
       ap: classDef.basePa,
       selected: true,

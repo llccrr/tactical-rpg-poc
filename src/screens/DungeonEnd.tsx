@@ -7,9 +7,10 @@ interface Props {
   /** resourceId looted, only set on success */
   lootedResourceId?: string;
   onBackToHub: () => void;
+  onGoToCraft: () => void;
 }
 
-export function DungeonEnd({ dungeonId, success, lootedResourceId, onBackToHub }: Props) {
+export function DungeonEnd({ dungeonId, success, lootedResourceId, onBackToHub, onGoToCraft }: Props) {
   const dungeon = getDungeonById(dungeonId);
   const resource = lootedResourceId ? getResourceById(lootedResourceId) : undefined;
 
@@ -71,24 +72,46 @@ export function DungeonEnd({ dungeonId, success, lootedResourceId, onBackToHub }
         </p>
       )}
 
-      <button
-        onClick={onBackToHub}
-        style={{
-          padding: "14px 40px",
-          fontSize: "1.1rem",
-          fontWeight: "bold",
-          color: "#fff",
-          background: "#1a2a3a",
-          border: "2px solid #4488bb",
-          borderRadius: 8,
-          cursor: "pointer",
-          transition: "transform 0.1s",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-      >
-        Retour au Hub
-      </button>
+      <div style={{ display: "flex", gap: 12 }}>
+        {success && (
+          <button
+            onClick={onGoToCraft}
+            style={{
+              padding: "14px 40px",
+              fontSize: "1.1rem",
+              fontWeight: "bold",
+              color: "#fff",
+              background: "#1a2a3a",
+              border: "2px solid #4488bb",
+              borderRadius: 8,
+              cursor: "pointer",
+              transition: "transform 0.1s",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+            onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+          >
+            Aller crafter
+          </button>
+        )}
+        <button
+          onClick={onBackToHub}
+          style={{
+            padding: "14px 40px",
+            fontSize: "1.1rem",
+            fontWeight: "bold",
+            color: success ? "#888" : "#fff",
+            background: success ? "transparent" : "#1a2a3a",
+            border: success ? "2px solid #444" : "2px solid #4488bb",
+            borderRadius: 8,
+            cursor: "pointer",
+            transition: "transform 0.1s",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
+          onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
+        >
+          Retour au Hub
+        </button>
+      </div>
     </div>
   );
 }

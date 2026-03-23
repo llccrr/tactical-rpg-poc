@@ -6,8 +6,8 @@
 |-------|-----|----------|--------|
 | 0 | Combat de base | Boucle de combat fonctionnelle | ✅ Done |
 | 1 | Classes | Sélection de classe, 2 classes jouables | ✅ Done |
-| 2 | Donjon & Loot | Salles enchaînées, ressources droppées | 🚧 En cours |
-| 3 | Craft & Équipement | Items craftables qui boostent les stats | ⏳ À venir |
+| 2 | Donjon & Loot | Salles enchaînées, ressources droppées | ✅ Done |
+| 3 | Craft & Équipement | Items craftables qui boostent les stats | ✅ Done |
 | 4 | Progression & Contenu | Tiers de difficulté, boss, nouvelles classes | ⏳ À venir |
 | 5 | Co-op Duo | 2 joueurs local puis réseau | ⏳ À venir |
 | 6 | Polish & Meta | Sauvegarde, hub visuel, sons, équilibrage | ⏳ À venir |

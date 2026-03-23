@@ -9,11 +9,13 @@ import { CombatLog } from "./CombatLog";
 import { CharacterCreate } from "./screens/CharacterCreate";
 import { Hub } from "./screens/Hub";
 import { DungeonEnd } from "./screens/DungeonEnd";
-import { createPlayerState, addResource, type PlayerState } from "./game/core/playerState";
+import { Crafting } from "./screens/Crafting";
+import { createPlayerState, addResource, getEquipmentBonuses, type PlayerState } from "./game/core/playerState";
 import type { DungeonRunState } from "./game/core/dungeonState";
 import { getDungeonById, rollLoot } from "./game/data/dungeons";
+import { RESOURCES } from "./game/data/resources";
 
-type Screen = "create" | "hub" | "fight" | "dungeon-end";
+type Screen = "create" | "hub" | "craft" | "fight" | "dungeon-end";
 
 const BASE_PHASER_CONFIG: Omit<Phaser.Types.Core.GameConfig, "parent"> = {
   type: Phaser.AUTO,
@@ -32,7 +34,7 @@ export default function App() {
   const sceneRef = useRef<BoardScene | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const dungeonRunRef = useRef<DungeonRunState | null>(null);
-  const playerClassRef = useRef<string>("bretteur");
+  const playerRef = useRef<PlayerState>(createPlayerState("bretteur"));
 
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [screen, setScreen] = useState<Screen>("create");
@@ -48,7 +50,7 @@ export default function App() {
 
   // Keep refs in sync so the effect always reads latest values without re-running
   dungeonRunRef.current = dungeonRun;
-  playerClassRef.current = player.classId;
+  playerRef.current = player;
 
   // ── Phaser init — runs only when roomKey changes ────────────
   // Uses requestAnimationFrame so the browser has finished layout
@@ -82,8 +84,9 @@ export default function App() {
     sceneRef.current = boardScene;
 
     boardScene.setOnStateChange(setGameState);
-    boardScene.setClassId(playerClassRef.current);
+    boardScene.setClassId(playerRef.current.classId);
     boardScene.setRoomConfig({ room: roomDef, playerHp: run.playerHp });
+    boardScene.setEquipmentBonuses(getEquipmentBonuses(playerRef.current));
     game.scene.add("BoardScene", boardScene, true);
 
     return () => {
@@ -203,7 +206,32 @@ export default function App() {
   }
 
   if (screen === "hub") {
-    return <Hub player={player} onStartDungeon={handleStartDungeon} onChangeClass={handleChangeClass} />;
+    return (
+      <Hub
+        player={player}
+        onPlayerChange={setPlayer}
+        onStartDungeon={handleStartDungeon}
+        onOpenCraft={() => setScreen("craft")}
+        onChangeClass={handleChangeClass}
+        onCheat={() => setPlayer((prev) => {
+          let next = prev;
+          for (const r of RESOURCES) {
+            next = addResource(next, r.id, 3);
+          }
+          return next;
+        })}
+      />
+    );
+  }
+
+  if (screen === "craft") {
+    return (
+      <Crafting
+        player={player}
+        onPlayerChange={setPlayer}
+        onBack={() => setScreen("hub")}
+      />
+    );
   }
 
   if (screen === "dungeon-end" && dungeonEndData) {
@@ -213,6 +241,7 @@ export default function App() {
         success={dungeonEndData.success}
         lootedResourceId={dungeonEndData.lootedResourceId}
         onBackToHub={handleBackToHub}
+        onGoToCraft={() => { setDungeonRun(null); setDungeonEndData(null); setScreen("craft"); }}
       />
     );
   }
@@ -224,7 +253,7 @@ export default function App() {
     : null;
 
   return (
-    <div style={{ display: "flex", height: "100vh" }}>
+    <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>
       <div style={{ flex: 1, position: "relative" }}>
         {roomLabel && (
           <div

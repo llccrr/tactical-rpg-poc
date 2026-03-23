@@ -11,6 +11,7 @@ import {
   type RoomConfig,
 } from "../core/gameState";
 import { computeDamage } from "../core/combat";
+import type { StatBonuses } from "../data/items";
 import { FightController } from "../core/fightController";
 import { CombatEventBus } from "../core/events";
 import { decideEnemyMove, decideEnemyAttack } from "../core/ai";
@@ -37,6 +38,7 @@ export class BoardScene extends Phaser.Scene {
   private eventBus!: CombatEventBus;
   private classId = "bretteur";
   private roomConfig?: RoomConfig;
+  private equipmentBonuses?: StatBonuses;
 
   constructor() {
     super({ key: "BoardScene" });
@@ -55,6 +57,11 @@ export class BoardScene extends Phaser.Scene {
   /** Set the room config (enemies + optional starting HP) before scene starts or reset */
   setRoomConfig(config: RoomConfig): void {
     this.roomConfig = config;
+  }
+
+  /** Set equipment stat bonuses before scene starts */
+  setEquipmentBonuses(bonuses: StatBonuses): void {
+    this.equipmentBonuses = bonuses;
   }
 
   /** Return current player HP (useful to persist between rooms) */
@@ -146,7 +153,7 @@ export class BoardScene extends Phaser.Scene {
   // ── internal ──────────────────────────────────────────────
 
   private initFight(): void {
-    this.state = createInitialState(this.classId, this.roomConfig);
+    this.state = createInitialState(this.classId, this.roomConfig, this.equipmentBonuses);
     this.eventBus = new CombatEventBus();
     this.fight = new FightController(this.state, this.eventBus);
   }

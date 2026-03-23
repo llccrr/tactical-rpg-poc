@@ -10,7 +10,19 @@
       "WebFetch(domain:www.wakfu.com)",
       "WebFetch(domain:wakfu.wiki.gg)",
       "WebFetch(domain:oropoproject.wordpress.com)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(pnpm dev:*)",
+      "Bash(rm -rf node_modules)",
+      "Bash(pnpm install:*)",
+      "Bash(pnpm build:*)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(pnpm add:*)",
+      "Bash(npx playwright:*)",
+      "Bash(node test-debug.mjs)",
+      "Bash(node test-debug2.mjs)",
+      "Bash(curl -s http://localhost:5173/src/App.tsx)",
+      "Bash(node -e \":*)",
+      "Bash(ls -la /Users/llccrr/dev/tactical-rpg-poc/src/App.*)"
     ]
   }
 }

@@ -8,6 +8,7 @@ import {
   TileType,
   ActionMode,
   type GameState,
+  type RoomConfig,
 } from "../core/gameState";
 import { computeDamage } from "../core/combat";
 import { FightController } from "../core/fightController";
@@ -35,6 +36,7 @@ export class BoardScene extends Phaser.Scene {
   private fight!: FightController;
   private eventBus!: CombatEventBus;
   private classId = "bretteur";
+  private roomConfig?: RoomConfig;
 
   constructor() {
     super({ key: "BoardScene" });
@@ -48,6 +50,16 @@ export class BoardScene extends Phaser.Scene {
   /** Set classId before scene starts */
   setClassId(classId: string): void {
     this.classId = classId;
+  }
+
+  /** Set the room config (enemies + optional starting HP) before scene starts or reset */
+  setRoomConfig(config: RoomConfig): void {
+    this.roomConfig = config;
+  }
+
+  /** Return current player HP (useful to persist between rooms) */
+  getPlayerHp(): number {
+    return this.state?.character?.hp ?? 0;
   }
 
   /** Start a fight with the given class — called from React */
@@ -134,7 +146,7 @@ export class BoardScene extends Phaser.Scene {
   // ── internal ──────────────────────────────────────────────
 
   private initFight(): void {
-    this.state = createInitialState(this.classId);
+    this.state = createInitialState(this.classId, this.roomConfig);
     this.eventBus = new CombatEventBus();
     this.fight = new FightController(this.state, this.eventBus);
   }

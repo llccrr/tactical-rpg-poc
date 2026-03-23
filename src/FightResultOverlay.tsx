@@ -2,11 +2,19 @@ import type { FightResult } from "./game/core/gameState";
 
 interface Props {
   result: FightResult;
-  onRetry: () => void;
-  onBackToMenu: () => void;
+  onPrimary: () => void;
+  primaryLabel: string;
+  onSecondary: () => void;
+  secondaryLabel: string;
 }
 
-export function FightResultOverlay({ result, onRetry, onBackToMenu }: Props) {
+export function FightResultOverlay({
+  result,
+  onPrimary,
+  primaryLabel,
+  onSecondary,
+  secondaryLabel,
+}: Props) {
   if (result === "ongoing") return null;
 
   const isVictory = result === "victory";
@@ -38,7 +46,7 @@ export function FightResultOverlay({ result, onRetry, onBackToMenu }: Props) {
       </h1>
       <div style={{ display: "flex", gap: 16 }}>
         <button
-          onClick={onRetry}
+          onClick={onPrimary}
           style={{
             padding: "12px 32px",
             fontSize: "1.1rem",
@@ -54,10 +62,10 @@ export function FightResultOverlay({ result, onRetry, onBackToMenu }: Props) {
           onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
           onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
         >
-          Rejouer
+          {primaryLabel}
         </button>
         <button
-          onClick={onBackToMenu}
+          onClick={onSecondary}
           style={{
             padding: "12px 32px",
             fontSize: "1.1rem",
@@ -73,7 +81,7 @@ export function FightResultOverlay({ result, onRetry, onBackToMenu }: Props) {
           onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.05)")}
           onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
         >
-          Changer de classe
+          {secondaryLabel}
         </button>
       </div>
     </div>

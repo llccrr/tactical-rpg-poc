@@ -6,6 +6,8 @@ interface DebugPanelProps {
   onReset: () => void;
   onSelectSpell: (index: number) => void;
   onEndTurn: () => void;
+  onWinFight: () => void;
+  onLoseFight: () => void;
 }
 
 export function DebugPanel({
@@ -13,6 +15,8 @@ export function DebugPanel({
   onReset,
   onSelectSpell,
   onEndTurn,
+  onWinFight,
+  onLoseFight,
 }: DebugPanelProps) {
   if (!state) return null;
 
@@ -189,21 +193,50 @@ export function DebugPanel({
         </>
       )}
 
-      <button
-        onClick={onReset}
-        style={{
-          marginTop: "auto",
-          padding: "8px 12px",
-          background: "#333",
-          color: "#fff",
-          border: "1px solid #555",
-          borderRadius: 4,
-          cursor: "pointer",
-          fontFamily: "monospace",
-        }}
-      >
-        Reset Board
-      </button>
+      <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+        <button
+          onClick={onWinFight}
+          style={{
+            padding: "8px 12px",
+            background: "#1a3a1a",
+            color: "#44cc88",
+            border: "1px solid #44cc88",
+            borderRadius: 4,
+            cursor: "pointer",
+            fontFamily: "monospace",
+          }}
+        >
+          Win fight
+        </button>
+        <button
+          onClick={onLoseFight}
+          style={{
+            padding: "8px 12px",
+            background: "#3a1a1a",
+            color: "#cc4444",
+            border: "1px solid #cc4444",
+            borderRadius: 4,
+            cursor: "pointer",
+            fontFamily: "monospace",
+          }}
+        >
+          Lose fight
+        </button>
+        <button
+          onClick={onReset}
+          style={{
+            padding: "8px 12px",
+            background: "#333",
+            color: "#fff",
+            border: "1px solid #555",
+            borderRadius: 4,
+            cursor: "pointer",
+            fontFamily: "monospace",
+          }}
+        >
+          Reset Board
+        </button>
+      </div>
     </div>
   );
 }

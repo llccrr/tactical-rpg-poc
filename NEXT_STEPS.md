@@ -1,49 +1,85 @@
-# Next Steps — Tactical RPG POC
+# Roadmap — Dungeon Crawler Wakfu/Dofus-like
 
-## 1. ~~Portée de sort~~ ✅
-- ~~Ajouter un `spellRange` dans `CharacterState`~~
-- ~~Créer un second flood-fill avec couleur distincte (rouge/bleu) pour la zone de ciblage~~
-- ~~Introduire un mode "ciblage" séparé du mode "déplacement" (enum `ActionMode`)~~
-- ~~Afficher un panneau de sorts dans le UI React~~
+## Phases
 
-## 2. ~~Ennemi~~ ✅
-- ~~Créer un `EnemyState` dans `gameState.ts` (position, HP, stats)~~
-- ~~Réutiliser la classe `Character` avec une couleur différente~~
-- ~~Ajouter la position de l'ennemi au `blockedSet` pour empêcher le chevauchement~~
-- ~~Afficher les infos ennemi au survol dans le DebugPanel~~
+| Phase | Nom | Objectif | Statut |
+|-------|-----|----------|--------|
+| 0 | Combat de base | Boucle de combat fonctionnelle | ✅ Done |
+| 1 | Classes | Sélection de classe, 2 classes jouables | ✅ Done |
+| 2 | Donjon & Loot | Salles enchaînées, ressources droppées | 🚧 En cours |
+| 3 | Craft & Équipement | Items craftables qui boostent les stats | ⏳ À venir |
+| 4 | Progression & Contenu | Tiers de difficulté, boss, nouvelles classes | ⏳ À venir |
+| 5 | Co-op Duo | 2 joueurs local puis réseau | ⏳ À venir |
+| 6 | Polish & Meta | Sauvegarde, hub visuel, sons, équilibrage | ⏳ À venir |
 
-## 3. ~~Tour par tour~~ ✅
-- ~~Introduire un `TurnManager` dans `core/` qui gère les phases :~~
-  - ~~`move` → `action` → `end turn`~~
-- ~~State `currentTurn: 'player' | 'enemy'`~~
-- ~~Bloquer les inputs pendant le tour ennemi~~
-- ~~Ajouter un bouton "End Turn" dans le UI React~~
-- Timeline visuelle des tours (à améliorer)
+---
 
-## 4. ~~IA basique~~ ✅
-- ~~L'ennemi utilise le même BFS pour se rapprocher du joueur~~
-- ~~Attaque si à portée (manhattan ≤ 1)~~
-- ~~Comportement simple : approche → attaque → fin de tour~~
-- Extensible vers des profils d'IA (agressif, défensif, etc.)
+## Phase 2 — Donjon & Loot ✅
 
-## 5. Intégration Tiled
-- Remplacer les `Graphics` par un tilemap JSON exporté depuis Tiled
-- Charger via `this.load.tilemapTiledJSON()`
-- Adapter `iso.ts` pour lire les dimensions depuis le tilemap
-- Utiliser les layers Tiled pour séparer sol / obstacles / décor
-- Possibilité de maps multiples
+### Livré
+- Structure de donjon (N salles + boss)
+- 3 donjons : Caverne des Gobelins (T1), Crypte des Squelettes (T1), Marais du Slime (T2)
+- 9 types d'ennemis définis dans `src/game/data/enemies.ts`
+- 9 ressources lootables définies dans `src/game/data/resources.ts`
+- HP persistants entre les salles d'un donjon
+- Écran Hub (sélection de donjon + inventaire ressources)
+- Écran DungeonEnd (récap victoire/défaite + ressource droppée)
+- Routing App.tsx : create → hub → fight (multi-salles) → dungeon-end
 
-## 6. ~~Stats et combat~~ ✅
-- ~~Ajouter HP, attaque, défense dans `CharacterState`~~
-- ~~Créer un `combat.ts` pur (logique de résolution de dommages)~~
-- ~~Formule de dégâts : `max(1, baseDamage + attaque - défense)`~~
-- ~~Barres de vie affichées au-dessus des personnages~~
-- ~~Victoire / Défaite avec overlay et bouton Rejouer~~
-- Animation de dégâts (nombre qui pop)
+---
 
-## 7. Améliorations visuelles
-- Sprites animés (idle, walk, attack) en remplacement des diamonds
-- Particules pour les sorts et les dégâts
-- Caméra : zoom + pan sur le board
-- Indicateurs de direction pendant le déplacement
-- Feedback sonore minimal
+## Phase 3 — Craft & Équipement
+
+### Objectif
+Permettre au joueur de crafter du stuff à partir des ressources accumulées, et que ce stuff améliore ses stats en combat.
+
+### À implémenter
+1. **Définitions d'items** (`src/game/data/items.ts`) : nom, slot (arme/armure/accessoire), bonus stats, recette (3 ressources)
+2. **Inventaire d'équipement** : le joueur équipe 1 item par slot
+3. **Écran de craft** (`src/screens/Crafting.tsx`) : liste items craftables, ressources requises vs possédées
+4. **Application des stats** : bonus d'équipement ajoutés aux stats de base au démarrage du combat
+5. **Progression** : items Tier 1 (ressources faciles) → Tier 2 (ressources donjons difficiles)
+
+### Fichiers
+- `src/game/data/items.ts` — nouveau
+- `src/game/core/playerState.ts` — ajouter `equipment`
+- `src/screens/Crafting.tsx` — nouveau
+- `src/game/core/fightController.ts` — appliquer les bonus d'équipement
+
+---
+
+## Phase 4 — Progression & Contenu
+
+### Objectif
+Élargir le contenu pour créer une vraie boucle long terme.
+
+### À implémenter
+1. **Tiers de difficulté** : Tier 1 (débutant) → Tier 3 (difficile), donjons verrouillés selon stuff
+2. **Ennemis variés** : comportements distincts (mêlée, ranged, tankeur)
+3. **Boss de donjon** : IA enrichie, sorts spéciaux
+4. **2 nouvelles classes** (ex: Mage, Paladin) dans `src/game/data/classes.ts`
+5. **Regen partielle** entre certaines salles
+
+---
+
+## Phase 5 — Co-op Duo
+
+### Objectif
+2 joueurs (local d'abord, réseau optionnel).
+
+### À implémenter
+1. Mode Solo / Duo à l'accueil
+2. Duo local : 2 personnages, tours alternés J1 → J2 → Ennemis
+3. `GameState.characters[]` à la place d'un seul `character`
+4. `FightController` multi-joueurs
+5. HUD avec 2 barres de stats
+
+---
+
+## Phase 6 — Polish & Meta
+
+1. **Sauvegarde** `localStorage` (inventaire, équipement, classe)
+2. **Hub visuel** : carte des donjons accessibles/verrouillés/complétés
+3. **Sons & musique** : effets de combat, ambiance par donjon
+4. **Animations** : attaque/sort sur les personnages
+5. **Équilibrage** : stats, coûts de craft, drop rates

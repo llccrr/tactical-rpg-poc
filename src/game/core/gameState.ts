@@ -1,8 +1,10 @@
 import type { GridPos } from "./grid";
 import { posKey } from "./grid";
-import { GRID_COLS, GRID_ROWS, DEFAULT_MOVE_RANGE, DEFAULT_AP } from "../config";
+import { GRID_COLS, GRID_ROWS } from "../config";
 import type { CombatEvent } from "./events";
 import { getClassById } from "../data/classes";
+import { makeEnemy } from "../data/enemies";
+import type { RoomDef } from "../data/dungeons";
 
 export enum TileType {
   Empty = "empty",
@@ -62,6 +64,13 @@ export interface GameState {
   combatLog: CombatEvent[];
 }
 
+/** Config for a single dungeon room — overrides default enemies and optionally player HP */
+export interface RoomConfig {
+  room: RoomDef;
+  /** If provided, player starts with this HP instead of max */
+  playerHp?: number;
+}
+
 /** Predefined obstacle positions for the POC */
 const OBSTACLE_POSITIONS: GridPos[] = [
   { x: 3, y: 2 },
@@ -75,8 +84,8 @@ const OBSTACLE_POSITIONS: GridPos[] = [
   { x: 1, y: 4 },
 ];
 
-/** Create the initial game state based on chosen class */
-export function createInitialState(classId: string): GameState {
+/** Create the initial game state based on chosen class and optional room config */
+export function createInitialState(classId: string, roomConfig?: RoomConfig): GameState {
   const classDef = getClassById(classId);
   if (!classDef) throw new Error(`Unknown class: ${classId}`);
 
@@ -88,11 +97,21 @@ export function createInitialState(classId: string): GameState {
     tiles[obs.y][obs.x] = TileType.Obstacle;
   }
 
+  const startHp = roomConfig?.playerHp ?? classDef.baseHp;
+
+  const enemies = roomConfig
+    ? roomConfig.room.enemies.map((e, i) => makeEnemy(e.defId, e.pos, String(i)))
+    : [
+        makeEnemy("gobelin", { x: 7, y: 2 }, "0"),
+        makeEnemy("squelette", { x: 2, y: 1 }, "1"),
+        makeEnemy("slime", { x: 8, y: 7 }, "2"),
+      ];
+
   return {
     tiles,
     character: {
       pos: { x: 4, y: 5 },
-      hp: classDef.baseHp,
+      hp: startHp,
       maxHp: classDef.baseHp,
       attack: classDef.baseAttack,
       defense: classDef.baseDefense,
@@ -101,44 +120,7 @@ export function createInitialState(classId: string): GameState {
       selected: true,
       spells: [...classDef.spells],
     },
-    enemies: [
-      {
-        id: "gobelin",
-        name: "Gobelin",
-        pos: { x: 7, y: 2 },
-        hp: 8,
-        maxHp: 8,
-        attack: 2,
-        defense: 0,
-        moveRange: 4,
-        ap: DEFAULT_AP,
-        spells: [{ name: "Griffe", range: 1, cost: 3, baseDamage: 3 }],
-      },
-      {
-        id: "squelette",
-        name: "Squelette",
-        pos: { x: 2, y: 1 },
-        hp: 12,
-        maxHp: 12,
-        attack: 3,
-        defense: 1,
-        moveRange: DEFAULT_MOVE_RANGE,
-        ap: DEFAULT_AP,
-        spells: [{ name: "Os tranchant", range: 1, cost: 3, baseDamage: 4 }],
-      },
-      {
-        id: "slime",
-        name: "Slime",
-        pos: { x: 8, y: 7 },
-        hp: 20,
-        maxHp: 20,
-        attack: 2,
-        defense: 3,
-        moveRange: 2,
-        ap: DEFAULT_AP,
-        spells: [{ name: "Ecrasement", range: 1, cost: 3, baseDamage: 2 }],
-      },
-    ],
+    enemies,
     actionMode: ActionMode.Move,
     activeSpellIndex: null,
     currentTurn: "player",

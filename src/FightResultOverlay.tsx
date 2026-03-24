@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type { FightResult } from "./game/core/gameState";
 
 interface Props {
@@ -15,6 +16,16 @@ export function FightResultOverlay({
   onSecondary,
   secondaryLabel,
 }: Props) {
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (result !== "ongoing") {
+      const timer = setTimeout(() => setVisible(true), 50);
+      return () => clearTimeout(timer);
+    }
+    setVisible(false);
+  }, [result]);
+
   if (result === "ongoing") return null;
 
   const isVictory = result === "victory";
@@ -28,7 +39,8 @@ export function FightResultOverlay({
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "rgba(0, 0, 0, 0.7)",
+        backgroundColor: visible ? "rgba(0, 0, 0, 0.7)" : "rgba(0, 0, 0, 0)",
+        transition: "background-color 0.4s ease",
         zIndex: 100,
       }}
     >
@@ -40,11 +52,22 @@ export function FightResultOverlay({
           textShadow: `0 0 20px ${isVictory ? "#44cc44" : "#cc3333"}`,
           marginBottom: "1.5rem",
           fontFamily: "sans-serif",
+          opacity: visible ? 1 : 0,
+          transform: visible ? "scale(1)" : "scale(0.8)",
+          transition: "all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
         }}
       >
         {isVictory ? "Victoire !" : "Defaite..."}
       </h1>
-      <div style={{ display: "flex", gap: 16 }}>
+      <div
+        style={{
+          display: "flex",
+          gap: 16,
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0)" : "translateY(15px)",
+          transition: "all 0.4s ease 0.2s",
+        }}
+      >
         <button
           onClick={onPrimary}
           style={{

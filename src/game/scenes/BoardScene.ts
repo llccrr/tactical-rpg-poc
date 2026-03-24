@@ -382,16 +382,12 @@ export class BoardScene extends Phaser.Scene {
       if (enemySprite) {
         const screen = gridToScreen(enemy.pos);
         showDamagePopup(this, screen.x, screen.y, damage);
+        enemySprite.playHitReaction(this);
       }
 
       if (killed) {
         this.eventBus.emit({ type: "death", entityId: enemy.id });
-        this.removeEnemy(enemy.id);
-      } else if (enemySprite) {
-        enemySprite.selected = true;
-        this.time.delayedCall(200, () => {
-          enemySprite.selected = false;
-        });
+        this.killEnemy(enemy.id);
       }
 
       this.state.actionMode = ActionMode.Move;
@@ -502,6 +498,7 @@ export class BoardScene extends Phaser.Scene {
       if (enemySprite) {
         const screen = gridToScreen(enemy.pos);
         showDamagePopup(this, screen.x, screen.y, result.damage);
+        enemySprite.playHitReaction(this);
       }
     }
 
@@ -538,15 +535,7 @@ export class BoardScene extends Phaser.Scene {
     // Handle kill
     if (result.killed) {
       this.eventBus.emit({ type: "death", entityId: enemy.id });
-      this.removeEnemy(enemy.id);
-    } else {
-      const enemySprite = this.enemySprites.get(enemy.id);
-      if (enemySprite) {
-        enemySprite.selected = true;
-        this.time.delayedCall(200, () => {
-          enemySprite.selected = false;
-        });
-      }
+      this.killEnemy(enemy.id);
     }
 
     // Apply rewards (PA from finisher kill or combo)
@@ -678,11 +667,7 @@ export class BoardScene extends Phaser.Scene {
 
         const playerScreen = gridToScreen(this.state.character.pos);
         showDamagePopup(this, playerScreen.x, playerScreen.y, damage);
-
-        this.character.selected = false;
-        this.time.delayedCall(200, () => {
-          this.character.selected = true;
-        });
+        this.character.playHitReaction(this);
 
         this.checkFightEnd();
         if (this.state.fightResult !== "ongoing") {
@@ -717,7 +702,7 @@ export class BoardScene extends Phaser.Scene {
     this.emitState();
   }
 
-  /** Remove a dead enemy from state and scene */
+  /** Remove a dead enemy from state and scene (no animation) */
   private removeEnemy(id: string): void {
     const index = this.state.enemies.findIndex((e) => e.id === id);
     if (index !== -1) this.state.enemies.splice(index, 1);
@@ -726,6 +711,22 @@ export class BoardScene extends Phaser.Scene {
     if (sprite) {
       sprite.destroy();
       this.enemySprites.delete(id);
+    }
+
+    if (this.hoveredEnemyId === id) {
+      this.hoveredEnemyId = null;
+    }
+  }
+
+  /** Kill enemy with death animation then remove from state */
+  private killEnemy(id: string): void {
+    const index = this.state.enemies.findIndex((e) => e.id === id);
+    if (index !== -1) this.state.enemies.splice(index, 1);
+
+    const sprite = this.enemySprites.get(id);
+    if (sprite) {
+      this.enemySprites.delete(id);
+      sprite.playDeathAnimation(this);
     }
 
     if (this.hoveredEnemyId === id) {

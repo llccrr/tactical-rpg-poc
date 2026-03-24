@@ -6,6 +6,7 @@ import { getEquipmentBonuses, unequipSlot, equipItem, type PlayerState } from ".
 
 interface Props {
   player: PlayerState;
+  completedDungeons: string[];
   onPlayerChange: (player: PlayerState) => void;
   onStartDungeon: (dungeonId: string) => void;
   onOpenCraft: () => void;
@@ -20,9 +21,9 @@ const TIER_COLORS: Record<number, string> = {
 };
 
 const SLOT_ORDER: { slot: ItemSlot; label: string; emptyIcon: string }[] = [
-  { slot: "arme", label: "Arme", emptyIcon: "⚔️" },
-  { slot: "armure", label: "Armure", emptyIcon: "🛡️" },
-  { slot: "accessoire", label: "Accessoire", emptyIcon: "💍" },
+  { slot: "arme", label: "Arme", emptyIcon: "\u2694\uFE0F" },
+  { slot: "armure", label: "Armure", emptyIcon: "\uD83D\uDEE1\uFE0F" },
+  { slot: "accessoire", label: "Accessoire", emptyIcon: "\uD83D\uDC8D" },
 ];
 
 /* ── Sidebar components ──────────────────────────────────── */
@@ -153,7 +154,7 @@ function EquipmentSlot({
             e.currentTarget.style.borderColor = "#553333";
           }}
         >
-          ✕
+          \u2715
         </button>
       )}
     </div>
@@ -195,78 +196,194 @@ function StatBar({
   );
 }
 
-/* ── Dungeon card ────────────────────────────────────────── */
+/* ── Dungeon node on the map ─────────────────────────────── */
 
-function DungeonCard({ dungeon, onStart }: { dungeon: DungeonDef; onStart: () => void }) {
+/** Dungeon positions on the visual map (percentage-based) */
+const DUNGEON_MAP_POSITIONS: Record<string, { x: number; y: number }> = {
+  caverne_gobelins:     { x: 18, y: 65 },
+  crypte_squelettes:    { x: 42, y: 40 },
+  marais_slime:         { x: 65, y: 60 },
+  forteresse_demoniaque:{ x: 85, y: 28 },
+};
+
+/** Path connections between dungeons */
+const DUNGEON_PATHS: [string, string][] = [
+  ["caverne_gobelins", "crypte_squelettes"],
+  ["crypte_squelettes", "marais_slime"],
+  ["marais_slime", "forteresse_demoniaque"],
+];
+
+function isDungeonUnlocked(dungeon: DungeonDef, completedDungeons: string[]): boolean {
+  // Tier 1 dungeons are always unlocked
+  if (dungeon.tier <= 1) return true;
+  // Higher tiers: need at least one dungeon of the previous tier completed
+  const prevTierDungeons = DUNGEONS.filter((d) => d.tier === dungeon.tier - 1);
+  return prevTierDungeons.some((d) => completedDungeons.includes(d.id));
+}
+
+function DungeonNode({
+  dungeon,
+  completed,
+  unlocked,
+  onStart,
+}: {
+  dungeon: DungeonDef;
+  completed: boolean;
+  unlocked: boolean;
+  onStart: () => void;
+}) {
   const tierColor = TIER_COLORS[dungeon.tier] ?? "#888";
+  const pos = DUNGEON_MAP_POSITIONS[dungeon.id] ?? { x: 50, y: 50 };
 
   return (
     <div
       style={{
-        width: 260,
-        padding: 20,
-        borderRadius: 12,
-        background: "#12121f",
-        border: "2px solid #333",
+        position: "absolute",
+        left: `${pos.x}%`,
+        top: `${pos.y}%`,
+        transform: "translate(-50%, -50%)",
         display: "flex",
         flexDirection: "column",
-        gap: 12,
+        alignItems: "center",
+        gap: 8,
+        zIndex: 2,
       }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h2 style={{ margin: 0, color: "#eee", fontSize: "1.1rem", fontFamily: "sans-serif" }}>
-          {dungeon.name}
-        </h2>
-        <span
+      {/* Node circle */}
+      <button
+        onClick={unlocked ? onStart : undefined}
+        disabled={!unlocked}
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: "50%",
+          border: `3px solid ${unlocked ? tierColor : "#333"}`,
+          background: completed
+            ? `${tierColor}33`
+            : unlocked
+            ? "#12121f"
+            : "#0a0a10",
+          cursor: unlocked ? "pointer" : "not-allowed",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 24,
+          transition: "all 0.2s",
+          boxShadow: completed
+            ? `0 0 16px ${tierColor}55`
+            : unlocked
+            ? `0 0 8px ${tierColor}22`
+            : "none",
+          opacity: unlocked ? 1 : 0.4,
+          position: "relative",
+        }}
+        onMouseEnter={(e) => {
+          if (unlocked) {
+            e.currentTarget.style.transform = "scale(1.12)";
+            e.currentTarget.style.boxShadow = `0 0 24px ${tierColor}88`;
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = "scale(1)";
+          e.currentTarget.style.boxShadow = completed
+            ? `0 0 16px ${tierColor}55`
+            : unlocked
+            ? `0 0 8px ${tierColor}22`
+            : "none";
+        }}
+      >
+        {completed ? (
+          <span style={{ fontSize: 28 }}>{"\u2714"}</span>
+        ) : !unlocked ? (
+          <span style={{ fontSize: 22, opacity: 0.5 }}>{"\uD83D\uDD12"}</span>
+        ) : (
+          <span style={{ fontSize: 22 }}>{"\u2694\uFE0F"}</span>
+        )}
+      </button>
+
+      {/* Label */}
+      <div
+        style={{
+          textAlign: "center",
+          maxWidth: 140,
+        }}
+      >
+        <div
           style={{
-            fontSize: "0.75rem",
-            fontFamily: "monospace",
-            color: tierColor,
-            border: `1px solid ${tierColor}`,
-            borderRadius: 4,
-            padding: "2px 6px",
+            fontFamily: "sans-serif",
+            fontSize: "0.82rem",
+            fontWeight: 700,
+            color: unlocked ? "#ddd" : "#555",
+            lineHeight: 1.2,
           }}
         >
-          T{dungeon.tier}
-        </span>
+          {dungeon.name}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginTop: 3 }}>
+          <span
+            style={{
+              fontSize: "0.65rem",
+              fontFamily: "monospace",
+              color: tierColor,
+              border: `1px solid ${unlocked ? tierColor : "#333"}`,
+              borderRadius: 3,
+              padding: "1px 5px",
+              opacity: unlocked ? 1 : 0.5,
+            }}
+          >
+            T{dungeon.tier}
+          </span>
+          <span style={{ fontSize: "0.65rem", fontFamily: "monospace", color: "#666" }}>
+            {dungeon.rooms.length} salles
+          </span>
+        </div>
+        {unlocked && (
+          <div style={{ fontSize: "0.65rem", fontFamily: "monospace", color: "#555", marginTop: 2 }}>
+            {dungeon.lootTable.map((e) => getResourceById(e.resourceId)?.icon ?? "?").join(" ")}
+          </div>
+        )}
       </div>
-      <p style={{ margin: 0, color: "#777", fontSize: "0.8rem", fontFamily: "sans-serif", lineHeight: 1.4 }}>
-        {dungeon.description}
-      </p>
-      <div style={{ fontFamily: "monospace", fontSize: 12, color: "#888" }}>
-        {dungeon.rooms.length} salles · Boss en salle {dungeon.rooms.length}
-      </div>
-      <div style={{ fontFamily: "monospace", fontSize: 11, color: "#666" }}>
-        Loot possible :{" "}
-        {dungeon.lootTable.map((e) => getResourceById(e.resourceId)?.icon ?? "?").join(" ")}
-      </div>
-      <button
-        onClick={onStart}
-        style={{
-          marginTop: 4,
-          padding: "10px 0",
-          fontSize: "0.95rem",
-          fontWeight: "bold",
-          fontFamily: "sans-serif",
-          color: "#fff",
-          background: "#1a3a2a",
-          border: "2px solid #44aa66",
-          borderRadius: 8,
-          cursor: "pointer",
-          transition: "transform 0.1s",
-        }}
-        onMouseEnter={(e) => (e.currentTarget.style.transform = "scale(1.03)")}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = "scale(1)")}
-      >
-        Entrer
-      </button>
     </div>
+  );
+}
+
+/* ── Path SVG between nodes ──────────────────────────────── */
+
+function DungeonPaths({ completedDungeons }: { completedDungeons: string[] }) {
+  return (
+    <svg
+      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", zIndex: 1 }}
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+    >
+      {DUNGEON_PATHS.map(([fromId, toId]) => {
+        const from = DUNGEON_MAP_POSITIONS[fromId];
+        const to = DUNGEON_MAP_POSITIONS[toId];
+        if (!from || !to) return null;
+
+        const bothCompleted = completedDungeons.includes(fromId) && completedDungeons.includes(toId);
+        const oneCompleted = completedDungeons.includes(fromId) || completedDungeons.includes(toId);
+
+        return (
+          <line
+            key={`${fromId}-${toId}`}
+            x1={from.x}
+            y1={from.y}
+            x2={to.x}
+            y2={to.y}
+            stroke={bothCompleted ? "#44aa8866" : oneCompleted ? "#44aa8833" : "#222233"}
+            strokeWidth={0.4}
+            strokeDasharray={bothCompleted ? "none" : "1 0.8"}
+          />
+        );
+      })}
+    </svg>
   );
 }
 
 /* ── Hub ─────────────────────────────────────────────────── */
 
-export function Hub({ player, onPlayerChange, onStartDungeon, onOpenCraft, onChangeClass, onCheat }: Props) {
+export function Hub({ player, completedDungeons, onPlayerChange, onStartDungeon, onOpenCraft, onChangeClass, onCheat }: Props) {
   const hasResources = RESOURCES.some((r) => (player.resources[r.id] ?? 0) > 0);
   const equippedIds = new Set(Object.values(player.equipment));
   const unequippedItems = player.ownedItems
@@ -279,12 +396,10 @@ export function Hub({ player, onPlayerChange, onStartDungeon, onOpenCraft, onCha
   const bonuses = getEquipmentBonuses(player);
 
   const handleChangeClass = () => {
-    if (hasEquipmentOrResources) {
-      const confirmed = window.confirm(
-        "Changer de classe va reinitialiser tes ressources et ton equipement. Continuer ?",
-      );
-      if (!confirmed) return;
-    }
+    const confirmed = window.confirm(
+      "Changer de classe va reinitialiser ta sauvegarde (ressources, equipement, progression). Continuer ?",
+    );
+    if (!confirmed) return;
     onChangeClass();
   };
 
@@ -327,7 +442,7 @@ export function Hub({ player, onPlayerChange, onStartDungeon, onOpenCraft, onCha
               fontSize: 24,
             }}
           >
-            {classDef?.id === "bretteur" ? "⚔️" : "🏹"}
+            {classDef?.id === "bretteur" ? "\u2694\uFE0F" : classDef?.id === "sentinelle" ? "\uD83C\uDFF9" : "\uD83D\uDCA5"}
           </div>
           <div style={{ color: classDef?.color ?? "#aaa", fontWeight: 700, fontSize: "1.1rem" }}>
             {classDef?.name ?? player.classId}
@@ -366,7 +481,7 @@ export function Hub({ player, onPlayerChange, onStartDungeon, onOpenCraft, onCha
         <div style={{ height: 1, background: "#1a1a2e" }} />
 
         {/* Equipment */}
-        <SidebarSection title="Équipement">
+        <SidebarSection title="\u00C9quipement">
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {SLOT_ORDER.map(({ slot, label, emptyIcon }) => (
               <EquipmentSlot
@@ -446,14 +561,14 @@ export function Hub({ player, onPlayerChange, onStartDungeon, onOpenCraft, onCha
                     onMouseEnter={(e) => (e.currentTarget.style.background = "#1a3a2a")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "#0e1e18")}
                   >
-                    Équiper
+                    \u00C9quiper
                   </button>
                 </div>
               ))}
             </div>
           ) : (
             <p style={{ color: "#333", fontSize: "0.8rem", margin: 0, fontStyle: "italic" }}>
-              {player.ownedItems.length > 0 ? "Tous les objets sont équipés" : "Aucun objet"}
+              {player.ownedItems.length > 0 ? "Tous les objets sont \u00e9quip\u00e9s" : "Aucun objet"}
             </p>
           )}
         </SidebarSection>
@@ -483,7 +598,7 @@ export function Hub({ player, onPlayerChange, onStartDungeon, onOpenCraft, onCha
                 >
                   <span style={{ fontSize: 15 }}>{r.icon}</span>
                   <span style={{ flex: 1 }}>{r.name}</span>
-                  <span style={{ color: "#666", fontWeight: 700 }}>×{player.resources[r.id]}</span>
+                  <span style={{ color: "#666", fontWeight: 700 }}>\u00d7{player.resources[r.id]}</span>
                 </div>
               ))}
             </div>
@@ -533,32 +648,61 @@ export function Hub({ player, onPlayerChange, onStartDungeon, onOpenCraft, onCha
         </div>
       </div>
 
-      {/* ── MAIN CONTENT ─────────────────────────────────── */}
+      {/* ── MAIN CONTENT — DUNGEON MAP ────────────────────── */}
       <div
         style={{
           flex: 1,
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
-          padding: "40px 32px",
-          gap: 40,
-          overflowY: "auto",
+          overflow: "hidden",
         }}
       >
-        {/* Title */}
-        <div style={{ textAlign: "center" }}>
-          <h1 style={{ margin: "0 0 6px", color: "#eee", fontSize: "1.8rem" }}>
-            Donjons
+        {/* Title bar */}
+        <div style={{ textAlign: "center", padding: "24px 0 0" }}>
+          <h1 style={{ margin: "0 0 4px", color: "#eee", fontSize: "1.6rem" }}>
+            Carte des Donjons
           </h1>
-          <p style={{ margin: 0, color: "#555", fontSize: "0.85rem" }}>
-            Choisis un donjon et pars à l'aventure
+          <p style={{ margin: 0, color: "#555", fontSize: "0.8rem" }}>
+            {completedDungeons.length}/{DUNGEONS.length} donjons termines
           </p>
         </div>
 
-        {/* Dungeon grid */}
-        <div style={{ display: "flex", gap: 20, flexWrap: "wrap", justifyContent: "center" }}>
+        {/* Map area */}
+        <div
+          style={{
+            flex: 1,
+            position: "relative",
+            margin: "20px 32px 32px",
+            background: "#0e0e1a",
+            border: "1px solid #1a1a2e",
+            borderRadius: 16,
+            overflow: "hidden",
+          }}
+        >
+          {/* Background pattern */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              opacity: 0.04,
+              backgroundImage:
+                "radial-gradient(circle, #ffffff 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
+            }}
+          />
+
+          {/* SVG paths between dungeons */}
+          <DungeonPaths completedDungeons={completedDungeons} />
+
+          {/* Dungeon nodes */}
           {DUNGEONS.map((d) => (
-            <DungeonCard key={d.id} dungeon={d} onStart={() => onStartDungeon(d.id)} />
+            <DungeonNode
+              key={d.id}
+              dungeon={d}
+              completed={completedDungeons.includes(d.id)}
+              unlocked={isDungeonUnlocked(d, completedDungeons)}
+              onStart={() => onStartDungeon(d.id)}
+            />
           ))}
         </div>
       </div>

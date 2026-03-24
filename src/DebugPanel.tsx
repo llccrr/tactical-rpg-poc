@@ -53,6 +53,7 @@ export function DebugPanel({
         flexDirection: "column",
         gap: 12,
         borderLeft: "1px solid #333",
+        overflowY: "auto",
       }}
     >
       {/* Turn info */}

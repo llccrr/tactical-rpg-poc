@@ -24,7 +24,17 @@
       "Bash(node -e \":*)",
       "Bash(ls -la /Users/llccrr/dev/tactical-rpg-poc/src/App.*)",
       "Bash(/tmp/check_resources.txt:*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(grep \"^export\" /home/loic/dev/tactical-rpg-poc/src/game/core/*.ts)",
+      "Bash(find /home/loic/dev/tactical-rpg-poc -type f -name *playwright* -o -name *test*)",
+      "Bash(cp /tmp/test-room-transition.mjs /home/loic/dev/tactical-rpg-poc/test-room-transition.mjs)",
+      "Bash(node test-room-transition.mjs)",
+      "Bash(npm install:*)",
+      "Bash(apt list:*)",
+      "Bash(dpkg -l)",
+      "Bash(ls /home/loic/dev/tactical-rpg-poc/test-*.mjs)",
+      "Bash(ls /home/loic/dev/tactical-rpg-poc/src/*.js /home/loic/dev/tactical-rpg-poc/src/**/*.js)",
+      "Bash(ls test-*.mjs)"
     ]
   }
 }

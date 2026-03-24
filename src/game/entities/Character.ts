@@ -93,6 +93,65 @@ export class Character extends Phaser.GameObjects.Graphics {
     super.destroy(fromScene);
   }
 
+  /** Play a hit reaction: quick shake + red flash */
+  playHitReaction(scene: Phaser.Scene): void {
+    const baseX = this.x;
+    const baseY = this.y;
+
+    // Shake: quick left-right-center
+    scene.tweens.add({
+      targets: this,
+      x: baseX - 4,
+      duration: 40,
+      yoyo: true,
+      repeat: 2,
+      ease: "Sine.easeInOut",
+      onUpdate: () => this.hpBar.syncPosition(this.x, this.y),
+      onComplete: () => {
+        this.setPosition(baseX, baseY);
+        this.hpBar.syncPosition(baseX, baseY);
+      },
+    });
+
+    // Flash white then back
+    const originalAlpha = this.alpha;
+    scene.tweens.add({
+      targets: this,
+      alpha: 0.3,
+      duration: 60,
+      yoyo: true,
+      ease: "Sine.easeOut",
+      onComplete: () => {
+        this.alpha = originalAlpha;
+      },
+    });
+  }
+
+  /** Play a death animation: shrink + fade out, then destroy */
+  playDeathAnimation(scene: Phaser.Scene): Promise<void> {
+    return new Promise((resolve) => {
+      scene.tweens.add({
+        targets: this,
+        scaleX: 0,
+        scaleY: 0,
+        alpha: 0,
+        duration: 300,
+        ease: "Back.easeIn",
+        onUpdate: () => this.hpBar.syncPosition(this.x, this.y),
+        onComplete: () => {
+          this.destroy();
+          resolve();
+        },
+      });
+      // Fade HP bar too
+      scene.tweens.add({
+        targets: this.hpBar,
+        alpha: 0,
+        duration: 200,
+      });
+    });
+  }
+
   /** Animate movement along a path with smooth acceleration/deceleration */
   async moveAlongPath(
     scene: Phaser.Scene,

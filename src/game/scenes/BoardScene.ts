@@ -88,6 +88,7 @@ export class BoardScene extends Phaser.Scene {
     this.character = this.createPlayerCharacter();
     this.createEnemySprites();
     this.showReachable();
+    this.setupTargetingCancelInput();
     this.emitState();
   }
 
@@ -163,6 +164,33 @@ export class BoardScene extends Phaser.Scene {
   }
 
   // ── internal ──────────────────────────────────────────────
+
+  /** Escape or click on empty canvas: exit spell targeting */
+  private setupTargetingCancelInput(): void {
+    const escKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    escKey?.on("down", () => {
+      if (this.state.fightResult !== "ongoing") return;
+      if (!this.fight.isPlayerTurn()) return;
+      if (this.character.isMoving) return;
+      if (this.state.actionMode !== ActionMode.Targeting) return;
+      this.switchToMoveMode();
+      this.emitState();
+    });
+
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (this.state.actionMode !== ActionMode.Targeting) return;
+      if (this.state.fightResult !== "ongoing") return;
+      if (!this.fight.isPlayerTurn()) return;
+      if (this.character.isMoving) return;
+      if (!pointer.leftButtonDown()) return;
+
+      const hits = this.input.hitTestPointer(pointer);
+      if (hits.length > 0) return;
+
+      this.switchToMoveMode();
+      this.emitState();
+    });
+  }
 
   private initFight(): void {
     this.state = createInitialState(this.classId, this.roomConfig, this.equipmentBonuses);
@@ -490,7 +518,11 @@ export class BoardScene extends Phaser.Scene {
 
     // ── Targeting mode: cast spell ──
     if (this.state.actionMode === ActionMode.Targeting) {
-      if (!this.spellRangeKeys.has(key)) return;
+      if (!this.spellRangeKeys.has(key)) {
+        this.switchToMoveMode();
+        this.emitState();
+        return;
+      }
 
       const spell = this.state.character.spells[this.state.activeSpellIndex!];
       if (!spell) return;

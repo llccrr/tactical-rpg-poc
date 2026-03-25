@@ -31,6 +31,7 @@ export class BoardScene extends Phaser.Scene {
   private character!: Character;
   private enemySprites = new Map<string, Character>();
   private reachableKeys = new Set<string>();
+  private pathPreviewKeys = new Set<string>();
   private spellRangeKeys = new Set<string>();
   private enemyThreatKeys = new Set<string>();
   private onStateChange?: OnStateChange;
@@ -98,6 +99,7 @@ export class BoardScene extends Phaser.Scene {
     this.enemySprites.forEach((s) => s.destroy());
     this.enemySprites.clear();
     this.reachableKeys.clear();
+    this.pathPreviewKeys.clear();
     this.spellRangeKeys.clear();
     this.enemyThreatKeys.clear();
     this.hoveredEnemyId = null;
@@ -264,8 +266,17 @@ export class BoardScene extends Phaser.Scene {
         this.tileMap.set(posKey({ x, y }), tile);
 
         if (tileType !== TileType.Obstacle) {
-          tile.on("pointerover", () => tile.setHover(true));
-          tile.on("pointerout", () => tile.setHover(false));
+          tile.on("pointerover", () => {
+            const useBlueHover = !(
+              this.state.actionMode === ActionMode.Move && this.fight.canPlayerMove()
+            );
+            if (useBlueHover) tile.setHover(true);
+            this.updateMovePathPreview({ x, y });
+          });
+          tile.on("pointerout", () => {
+            tile.setHover(false);
+            this.clearMovePathPreview();
+          });
           tile.on("pointerdown", () => this.handleTileClick({ x, y }));
         }
       }
@@ -289,7 +300,37 @@ export class BoardScene extends Phaser.Scene {
     }
   }
 
+  /** Preview the BFS shortest path to `dest` while hovering a reachable tile */
+  private updateMovePathPreview(dest: GridPos): void {
+    this.clearMovePathPreview();
+    if (this.state.actionMode !== ActionMode.Move) return;
+    if (!this.fight.canPlayerMove()) return;
+    if (this.character.isMoving) return;
+
+    const destKey = posKey(dest);
+    if (!this.reachableKeys.has(destKey)) return;
+
+    const blocked = getBlockedSet(this.state);
+    const path = findPath(this.state.character.pos, dest, blocked);
+    if (!path || path.length === 0) return;
+    if (path.length > this.state.remainingPM) return;
+
+    for (const step of path) {
+      const k = posKey(step);
+      this.pathPreviewKeys.add(k);
+      this.tileMap.get(k)?.setPathPreview(true);
+    }
+  }
+
+  private clearMovePathPreview(): void {
+    for (const key of this.pathPreviewKeys) {
+      this.tileMap.get(key)?.setPathPreview(false);
+    }
+    this.pathPreviewKeys.clear();
+  }
+
   private clearReachable(): void {
+    this.clearMovePathPreview();
     for (const key of this.reachableKeys) {
       this.tileMap.get(key)?.setReachable(false);
     }

@@ -15,6 +15,9 @@ const COLORS = {
   spellRangeStroke: 0x66aaff,
   hover: 0x5588dd,
   hoverStroke: 0x77aaff,
+  /** Tiles along the previewed move path (distinct from generic reachable) */
+  pathPreview: 0xe8cc44,
+  pathPreviewStroke: 0xffee88,
   enemyThreat: 0xcc4444,
   enemyThreatStroke: 0xee6666,
 } as const;
@@ -29,9 +32,11 @@ export class Tile extends Phaser.GameObjects.Polygon {
 
   private baseColor: number;
   private baseStroke: number;
-  private highlighted = false;
+  private reachable = false;
+  private pathPreview = false;
   private spellHighlighted = false;
   private threatHighlighted = false;
+  private hover = false;
 
   constructor(scene: Phaser.Scene, gridPos: GridPos, tileType: TileType) {
     const screen = gridToScreen(gridPos);
@@ -77,58 +82,64 @@ export class Tile extends Phaser.GameObjects.Polygon {
 
   /** Show this tile as reachable (movement highlight) */
   setReachable(on: boolean): void {
-    this.highlighted = on;
-    if (on) {
-      this.setFillStyle(COLORS.reachable, 0.35);
-      this.setStrokeStyle(2, COLORS.reachableStroke, 0.9);
-    } else {
-      this.setFillStyle(this.baseColor, 1);
-      this.setStrokeStyle(1.5, this.baseStroke, 0.8);
-    }
+    this.reachable = on;
+    this.applyAppearance();
+  }
+
+  /** Highlight as part of the previewed path to the hovered destination */
+  setPathPreview(on: boolean): void {
+    this.pathPreview = on;
+    this.applyAppearance();
   }
 
   /** Show this tile as in spell range (targeting highlight) */
   setSpellRange(on: boolean): void {
     this.spellHighlighted = on;
-    if (on) {
-      this.setFillStyle(COLORS.spellRange, 0.35);
-      this.setStrokeStyle(2, COLORS.spellRangeStroke, 0.9);
-    } else {
-      this.setFillStyle(this.baseColor, 1);
-      this.setStrokeStyle(1.5, this.baseStroke, 0.8);
-    }
+    this.applyAppearance();
   }
 
   /** Show this tile as enemy threat zone */
   setEnemyThreat(on: boolean): void {
     this.threatHighlighted = on;
-    if (on) {
-      this.setFillStyle(COLORS.enemyThreat, 0.25);
-      this.setStrokeStyle(1.5, COLORS.enemyThreatStroke, 0.7);
-    } else if (this.spellHighlighted) {
-      this.setSpellRange(true);
-    } else if (this.highlighted) {
-      this.setReachable(true);
-    } else {
-      this.setFillStyle(this.baseColor, 1);
-      this.setStrokeStyle(1.5, this.baseStroke, 0.8);
-    }
+    this.applyAppearance();
   }
 
   /** Hover feedback */
   setHover(on: boolean): void {
-    if (on) {
+    this.hover = on;
+    this.applyAppearance();
+  }
+
+  /**
+   * Priority: threat > spell > hover > path preview > reachable > base
+   */
+  private applyAppearance(): void {
+    if (this.threatHighlighted) {
+      this.setFillStyle(COLORS.enemyThreat, 0.25);
+      this.setStrokeStyle(1.5, COLORS.enemyThreatStroke, 0.7);
+      return;
+    }
+    if (this.spellHighlighted) {
+      this.setFillStyle(COLORS.spellRange, 0.35);
+      this.setStrokeStyle(2, COLORS.spellRangeStroke, 0.9);
+      return;
+    }
+    if (this.hover) {
       this.setFillStyle(COLORS.hover, 0.45);
       this.setStrokeStyle(2, COLORS.hoverStroke, 1);
-    } else if (this.threatHighlighted) {
-      this.setEnemyThreat(true);
-    } else if (this.spellHighlighted) {
-      this.setSpellRange(true);
-    } else if (this.highlighted) {
-      this.setReachable(true);
-    } else {
-      this.setFillStyle(this.baseColor, 1);
-      this.setStrokeStyle(1.5, this.baseStroke, 0.8);
+      return;
     }
+    if (this.pathPreview) {
+      this.setFillStyle(COLORS.pathPreview, 0.42);
+      this.setStrokeStyle(2.5, COLORS.pathPreviewStroke, 0.95);
+      return;
+    }
+    if (this.reachable) {
+      this.setFillStyle(COLORS.reachable, 0.35);
+      this.setStrokeStyle(2, COLORS.reachableStroke, 0.9);
+      return;
+    }
+    this.setFillStyle(this.baseColor, 1);
+    this.setStrokeStyle(1.5, this.baseStroke, 0.8);
   }
 }

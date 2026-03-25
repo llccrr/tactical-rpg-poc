@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { GRID_COLS, GRID_ROWS } from "../config";
+import { GRID_COLS, GRID_ROWS, DPR } from "../config";
 import { posKey } from "../core/grid";
 import type { GridPos } from "../core/grid";
 import {
@@ -35,6 +35,7 @@ export class BoardScene extends Phaser.Scene {
   private enemyThreatKeys = new Set<string>();
   private onStateChange?: OnStateChange;
   private hoveredEnemyId: string | null = null;
+  private enemyHoverTooltip: Phaser.GameObjects.Container | null = null;
 
   private fight!: FightController;
   private eventBus!: CombatEventBus;
@@ -100,6 +101,7 @@ export class BoardScene extends Phaser.Scene {
     this.spellRangeKeys.clear();
     this.enemyThreatKeys.clear();
     this.hoveredEnemyId = null;
+    this.hideEnemyMiniTooltip();
     this.eventBus.clear();
 
     this.initFight();
@@ -211,12 +213,14 @@ export class BoardScene extends Phaser.Scene {
         if (this.state.actionMode !== ActionMode.Targeting) {
           this.showEnemyThreatZone(id);
         }
+        this.showEnemyMiniTooltip(id);
         this.emitState();
       });
       sprite.on("pointerout", () => {
         if (this.hoveredEnemyId === id) {
           this.hoveredEnemyId = null;
           this.clearEnemyThreatZone();
+          this.hideEnemyMiniTooltip();
           this.emitState();
         }
       });
@@ -356,6 +360,61 @@ export class BoardScene extends Phaser.Scene {
       this.tileMap.get(key)?.setEnemyThreat(false);
     }
     this.enemyThreatKeys.clear();
+  }
+
+  /** Show a mini tooltip (name + HP) above the hovered enemy */
+  private showEnemyMiniTooltip(enemyId: string): void {
+    this.hideEnemyMiniTooltip();
+
+    const enemy = this.state.enemies.find((e) => e.id === enemyId);
+    if (!enemy) return;
+    const sprite = this.enemySprites.get(enemyId);
+    if (!sprite) return;
+
+    const label = `${enemy.name} | ${enemy.hp}/${enemy.maxHp}`;
+
+    const text = this.add.text(0, 0, label, {
+      fontFamily: "monospace",
+      fontSize: `${11 * DPR}px`,
+      fontStyle: "bold",
+      color: "#f0f0f0",
+      padding: { left: 8 * DPR, right: 8 * DPR, top: 3 * DPR, bottom: 3 * DPR },
+    });
+    text.setOrigin(0.5, 1);
+
+    // Heart icon
+    const heart = this.add.text(0, 0, "❤", {
+      fontFamily: "monospace",
+      fontSize: `${10 * DPR}px`,
+      color: "#ef4444",
+    });
+    heart.setOrigin(0.5, 1);
+
+    // Background
+    const totalW = text.width + heart.width + 6 * DPR;
+    const totalH = Math.max(text.height, heart.height);
+    const bg = this.add.graphics();
+    bg.fillStyle(0x0c0c14, 0.9);
+    bg.fillRoundedRect(-totalW / 2 - 2, -totalH - 2, totalW + 4, totalH + 4, 4 * DPR);
+    bg.lineStyle(1, 0x2a3050, 1);
+    bg.strokeRoundedRect(-totalW / 2 - 2, -totalH - 2, totalW + 4, totalH + 4, 4 * DPR);
+
+    // Position heart + text side by side
+    heart.setPosition(-totalW / 2 + heart.width / 2 + 2, 0);
+    text.setPosition(heart.width / 2 + 3 * DPR, 0);
+
+    const container = this.add.container(sprite.x, sprite.y - 38 * DPR, [bg, heart, text]);
+    container.setDepth(50);
+
+    this.enemyHoverTooltip = container;
+  }
+
+  /** Remove the mini tooltip */
+  private hideEnemyMiniTooltip(): void {
+    if (this.enemyHoverTooltip) {
+      this.enemyHoverTooltip.destroy();
+      this.enemyHoverTooltip = null;
+    }
   }
 
   private async handleTileClick(pos: GridPos): Promise<void> {
@@ -750,6 +809,7 @@ export class BoardScene extends Phaser.Scene {
 
     if (this.hoveredEnemyId === id) {
       this.hoveredEnemyId = null;
+      this.hideEnemyMiniTooltip();
     }
   }
 
@@ -766,6 +826,7 @@ export class BoardScene extends Phaser.Scene {
 
     if (this.hoveredEnemyId === id) {
       this.hoveredEnemyId = null;
+      this.hideEnemyMiniTooltip();
     }
   }
 
@@ -810,6 +871,6 @@ export class BoardScene extends Phaser.Scene {
       combatLog: [...this.state.combatLog],
       ioplikeState: this.state.ioplikeState ? { ...this.state.ioplikeState } : undefined,
       hoveredEnemyId: this.hoveredEnemyId,
-    } as GameState & { hoveredEnemyId: string | null });
+    });
   }
 }

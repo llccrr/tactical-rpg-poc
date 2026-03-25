@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { TILE_WIDTH, TILE_HEIGHT } from "../config";
+import { TILE_WIDTH, TILE_HEIGHT, DPR } from "../config";
 import { gridToScreen } from "../core/iso";
 import type { GridPos } from "../core/grid";
 import { TileType } from "../core/gameState";

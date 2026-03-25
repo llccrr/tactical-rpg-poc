@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { GameState } from "./game/core/gameState";
+import type { GameState, EnemyState } from "./game/core/gameState";
 import { ActionMode } from "./game/core/gameState";
 import type { IopLikeState } from "./game/core/ioplike";
 
@@ -878,6 +878,190 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Enemy hover tooltip ─────────────────────────── */
+
+const BEHAVIOR_LABEL: Record<string, { label: string; color: string }> = {
+  melee: { label: "Mêlée", color: "#f87171" },
+  ranged: { label: "Distance", color: "#38bdf8" },
+  tank: { label: "Tank", color: "#a3e635" },
+  boss: { label: "Boss", color: "#f59e0b" },
+};
+
+export function EnemyTooltip({ state }: { state: GameState | null }) {
+  if (!state || !state.hoveredEnemyId) return null;
+
+  const enemy = state.enemies.find((e) => e.id === state.hoveredEnemyId);
+  if (!enemy) return null;
+
+  const hpPct = Math.max(0, Math.min(100, (enemy.hp / enemy.maxHp) * 100));
+  const hpBarColor = hpPct > 50 ? "#44cc44" : hpPct > 25 ? "#cccc44" : "#cc3333";
+  const behavior = BEHAVIOR_LABEL[enemy.behavior];
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 12,
+        right: 12,
+        zIndex: 30,
+        pointerEvents: "none",
+        filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.7))",
+      }}
+    >
+      <div
+        style={{
+          minWidth: 200,
+          background: "linear-gradient(180deg, #1a1e2e 0%, #12141f 100%)",
+          border: "2px solid #2a3050",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        {/* Header: name + behavior */}
+        <div
+          style={{
+            padding: "8px 12px 6px",
+            background: "linear-gradient(180deg, #222840 0%, #1a1e2e 100%)",
+            borderBottom: "1px solid #2a3050",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: "#f0f0f0",
+              fontFamily: "monospace",
+              textTransform: "uppercase",
+              letterSpacing: 1,
+            }}
+          >
+            {enemy.name}
+          </span>
+          {behavior && (
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                color: behavior.color,
+                fontFamily: "monospace",
+                padding: "1px 6px",
+                background: `${behavior.color}18`,
+                border: `1px solid ${behavior.color}44`,
+                borderRadius: 3,
+                textTransform: "uppercase",
+                letterSpacing: 0.3,
+              }}
+            >
+              {behavior.label}
+            </span>
+          )}
+        </div>
+
+        {/* Body: HP bar + stats */}
+        <div style={{ padding: "8px 12px 10px", display: "flex", flexDirection: "column", gap: 6 }}>
+          {/* HP */}
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+                marginBottom: 3,
+              }}
+            >
+              <span style={{ fontSize: 10, color: "#888", fontFamily: "monospace", fontWeight: 700 }}>
+                PV
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "#e8e8e8", fontFamily: "monospace" }}>
+                {enemy.hp}
+                <span style={{ color: "#555" }}> / {enemy.maxHp}</span>
+              </span>
+            </div>
+            <div
+              style={{
+                height: 6,
+                background: "#1a1a2e",
+                borderRadius: 3,
+                border: "1px solid #2a2a3e",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${hpPct}%`,
+                  height: "100%",
+                  background: hpBarColor,
+                  borderRadius: 3,
+                  transition: "width 0.3s ease",
+                  boxShadow: `0 0 6px ${hpBarColor}44`,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Stats row */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <StatPill label="ATQ" value={enemy.attack} color="#fb923c" />
+            <StatPill label="DEF" value={enemy.defense} color="#60a5fa" />
+            <StatPill label="PM" value={enemy.moveRange} color="#4ade80" />
+            <StatPill label="PA" value={enemy.ap} color="#a78bfa" />
+          </div>
+
+          {/* Spells preview */}
+          {enemy.spells.length > 0 && (
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 2 }}>
+              {enemy.spells.map((s, i) => (
+                <span
+                  key={i}
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    color: "#aaa",
+                    fontFamily: "monospace",
+                    padding: "1px 5px",
+                    background: "#ffffff08",
+                    borderRadius: 3,
+                    border: "1px solid #ffffff15",
+                  }}
+                >
+                  {s.name} ({s.baseDamage}dmg, {s.range}po)
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatPill({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "2px 6px",
+        background: `${color}12`,
+        borderRadius: 3,
+        border: `1px solid ${color}33`,
+      }}
+    >
+      <span style={{ fontSize: 9, fontWeight: 700, color: `${color}99`, fontFamily: "monospace" }}>
+        {label}
+      </span>
+      <span style={{ fontSize: 11, fontWeight: 800, color, fontFamily: "monospace" }}>
+        {value}
+      </span>
     </div>
   );
 }

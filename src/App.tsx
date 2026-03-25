@@ -3,7 +3,7 @@ import Phaser from "phaser";
 import { BoardScene } from "./game/scenes/BoardScene";
 import type { GameState } from "./game/core/gameState";
 import { DebugPanel } from "./DebugPanel";
-import { GameHUD } from "./GameHUD";
+import { GameHUD, EnemyTooltip } from "./GameHUD";
 import { FightResultOverlay } from "./FightResultOverlay";
 import { CombatLog } from "./CombatLog";
 import { CharacterCreate } from "./screens/CharacterCreate";
@@ -19,12 +19,18 @@ import { ScreenTransition } from "./components/ScreenTransition";
 
 type Screen = "create" | "hub" | "craft" | "fight" | "dungeon-end";
 
+const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
 const BASE_PHASER_CONFIG: Omit<Phaser.Types.Core.GameConfig, "parent"> = {
   type: Phaser.AUTO,
-  width: 1024,
-  height: 640,
+  width: 1024 * DPR,
+  height: 640 * DPR,
   backgroundColor: "#16162a",
   scene: [],
+  render: {
+    antialias: true,
+    roundPixels: true,
+  },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -350,6 +356,7 @@ export default function App() {
           </div>
         )}
         <CombatLog state={gameState} />
+        <EnemyTooltip state={gameState} />
         <GameHUD state={gameState} onSelectSpell={handleSelectSpell} onEndTurn={handleEndTurn} />
         {gameState && (
           <FightResultOverlay

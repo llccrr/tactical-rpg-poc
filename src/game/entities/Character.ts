@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { TILE_WIDTH, TILE_HEIGHT, MOVE_STEP_DURATION } from "../config";
+import { TILE_WIDTH, TILE_HEIGHT, MOVE_STEP_DURATION, DPR } from "../config";
 import { gridToScreen } from "../core/iso";
 import type { GridPos } from "../core/grid";
 import { HpBar } from "./HpBar";
@@ -7,7 +7,7 @@ import { HpBar } from "./HpBar";
 /** Cube dimensions in isometric projection */
 const CUBE_W = TILE_WIDTH * 0.45;   // width of the cube footprint
 const CUBE_H = TILE_HEIGHT * 0.45;  // depth of the cube footprint (iso)
-const CUBE_ELEVATION = 20;          // cube height in pixels
+const CUBE_ELEVATION = 20 * DPR;    // cube height in pixels
 
 export interface CharacterColors {
   top: number;
@@ -106,7 +106,7 @@ export class Character extends Phaser.GameObjects.Graphics {
     // Shake: quick left-right-center
     scene.tweens.add({
       targets: this,
-      x: baseX - 4,
+      x: baseX - 4 * DPR,
       duration: 40,
       yoyo: true,
       repeat: 2,

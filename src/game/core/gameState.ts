@@ -75,6 +75,8 @@ export interface GameState {
   combatLog: CombatEvent[];
   /** IopLike class-specific combat state (only set when playing IopLike) */
   ioplikeState?: IopLikeState;
+  /** Currently hovered enemy id (set by BoardScene pointer events) */
+  hoveredEnemyId?: string | null;
 }
 
 /** Config for a single dungeon room — overrides default enemies and optionally player HP */

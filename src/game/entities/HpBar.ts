@@ -1,8 +1,9 @@
 import Phaser from "phaser";
+import { DPR } from "../config";
 
-const BAR_WIDTH = 32;
-const BAR_HEIGHT = 4;
-const BAR_OFFSET_Y = -28; // above the character cube
+const BAR_WIDTH = 32 * DPR;
+const BAR_HEIGHT = 4 * DPR;
+const BAR_OFFSET_Y = -28 * DPR; // above the character cube
 
 export class HpBar extends Phaser.GameObjects.Graphics {
   private currentRatio = 1;

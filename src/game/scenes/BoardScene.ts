@@ -371,39 +371,62 @@ export class BoardScene extends Phaser.Scene {
     const sprite = this.enemySprites.get(enemyId);
     if (!sprite) return;
 
-    const label = `${enemy.name} | ${enemy.hp}/${enemy.maxHp}`;
-
-    const text = this.add.text(0, 0, label, {
+    const textStyle = {
       fontFamily: "monospace",
       fontSize: `${11 * DPR}px`,
-      fontStyle: "bold",
+      fontStyle: "bold" as const,
       color: "#f0f0f0",
-      padding: { left: 8 * DPR, right: 8 * DPR, top: 3 * DPR, bottom: 3 * DPR },
-    });
-    text.setOrigin(0.5, 1);
+    };
+    const padBlock = { top: 3 * DPR, bottom: 3 * DPR } as const;
 
-    // Heart icon
+    const nameText = this.add.text(0, 0, `${enemy.name} | `, {
+      ...textStyle,
+      padding: { ...padBlock, left: 8 * DPR, right: 0 },
+    });
+    const hpText = this.add.text(0, 0, `${enemy.hp}/${enemy.maxHp}`, {
+      ...textStyle,
+      padding: { ...padBlock, left: 0, right: 8 * DPR },
+    });
+
     const heart = this.add.text(0, 0, "❤", {
       fontFamily: "monospace",
-      fontSize: `${10 * DPR}px`,
+      fontSize: `${12 * DPR}px`,
       color: "#ef4444",
     });
-    heart.setOrigin(0.5, 1);
+
+    const gapAfterName = 3 * DPR;
+    const gapBeforeHp = 2 * DPR;
+    const padX = 2 * DPR;
+    const totalW =
+      padX +
+      nameText.width +
+      gapAfterName +
+      heart.width +
+      gapBeforeHp +
+      hpText.width +
+      padX;
+    const totalH = Math.max(nameText.height, heart.height, hpText.height);
+    const centerY = -totalH / 2;
+
+    nameText.setOrigin(0.5, 0.5);
+    heart.setOrigin(0.5, 0.5);
+    hpText.setOrigin(0.5, 0.5);
 
     // Background
-    const totalW = text.width + heart.width + 6 * DPR;
-    const totalH = Math.max(text.height, heart.height);
     const bg = this.add.graphics();
     bg.fillStyle(0x0c0c14, 0.9);
     bg.fillRoundedRect(-totalW / 2 - 2, -totalH - 2, totalW + 4, totalH + 4, 4 * DPR);
     bg.lineStyle(1, 0x2a3050, 1);
     bg.strokeRoundedRect(-totalW / 2 - 2, -totalH - 2, totalW + 4, totalH + 4, 4 * DPR);
 
-    // Position heart + text side by side
-    heart.setPosition(-totalW / 2 + heart.width / 2 + 2, 0);
-    text.setPosition(heart.width / 2 + 3 * DPR, 0);
+    const left = -totalW / 2 + padX;
+    const heartLeft = left + nameText.width + gapAfterName;
+    const hpLeft = heartLeft + heart.width + gapBeforeHp;
+    nameText.setPosition(left + nameText.width / 2, centerY);
+    heart.setPosition(heartLeft + heart.width / 2, centerY);
+    hpText.setPosition(hpLeft + hpText.width / 2, centerY);
 
-    const container = this.add.container(sprite.x, sprite.y - 38 * DPR, [bg, heart, text]);
+    const container = this.add.container(sprite.x, sprite.y - 38 * DPR, [bg, nameText, heart, hpText]);
     container.setDepth(50);
 
     this.enemyHoverTooltip = container;

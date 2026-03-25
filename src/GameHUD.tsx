@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { GameState } from "./game/core/gameState";
 import { ActionMode } from "./game/core/gameState";
 import type { IopLikeState } from "./game/core/ioplike";
@@ -249,6 +250,285 @@ function StatusBadge({
   );
 }
 
+/* ── Element icon ──────────────────────────────────── */
+
+const ELEMENT_META: Record<string, { label: string; color: string; icon: string }> = {
+  air: { label: "Air", color: "#7dd3fc", icon: "💨" },
+  earth: { label: "Terre", color: "#a3e635", icon: "🪨" },
+  fire: { label: "Feu", color: "#fb923c", icon: "🔥" },
+  neutral: { label: "Neutre", color: "#a1a1aa", icon: "⚔️" },
+};
+
+function ElementBadge({ element }: { element: string }) {
+  const meta = ELEMENT_META[element];
+  if (!meta) return null;
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        padding: "1px 6px",
+        borderRadius: 3,
+        background: `${meta.color}18`,
+        border: `1px solid ${meta.color}44`,
+        fontSize: 10,
+        fontWeight: 700,
+        color: meta.color,
+        fontFamily: "monospace",
+      }}
+    >
+      <span style={{ fontSize: 11 }}>{meta.icon}</span>
+      {meta.label}
+    </span>
+  );
+}
+
+/* ── Tag labels ────────────────────────────────────── */
+
+const TAG_DISPLAY: Record<string, { label: string; color: string }> = {
+  melee: { label: "Mêlée", color: "#f87171" },
+  damage: { label: "Dégâts", color: "#fb923c" },
+  utility: { label: "Utilitaire", color: "#a78bfa" },
+  mobility: { label: "Mobilité", color: "#34d399" },
+  finisher: { label: "Finisseur", color: "#f43f5e" },
+  aoe: { label: "Zone", color: "#fbbf24" },
+  pull: { label: "Attraction", color: "#38bdf8" },
+  armorBreak: { label: "Brise-armure", color: "#c084fc" },
+  concentrationGenerator: { label: "Génère Concentration", color: "#f59e0b" },
+  bloodPoint: { label: "Point de sang", color: "#ef4444" },
+  combo3AP: { label: "Combo 3PA", color: "#60a5fa" },
+  combo1AP: { label: "Combo 1PA", color: "#60a5fa" },
+  wrathConsumer: { label: "Consomme Courroux", color: "#f97316" },
+};
+
+/* ── Spell tooltip ──────────────────────────────────── */
+
+function SpellTooltip({
+  spell,
+}: {
+  spell: {
+    name: string;
+    range: number;
+    cost: number;
+    baseDamage: number;
+    rangeMin?: number;
+    bloodPointCost?: number;
+    mpCost?: number;
+    element?: string;
+    tags?: string[];
+    description?: string;
+  };
+}) {
+  const isBlood = (spell.bloodPointCost ?? 0) > 0;
+  const isMp = (spell.mpCost ?? 0) > 0;
+  const costValue = isBlood ? spell.bloodPointCost! : isMp ? spell.mpCost! : spell.cost;
+  const costLabel = isBlood ? "PS" : isMp ? "PM" : "PA";
+  const costColor = isBlood ? "#ef4444" : isMp ? "#4ade80" : "#60a5fa";
+
+  const rangeMin = spell.rangeMin ?? 1;
+  const rangeText = rangeMin === spell.range ? `${spell.range}` : `${rangeMin}-${spell.range}`;
+
+  // Pick displayable tags
+  const displayTags = (spell.tags ?? [])
+    .map((t) => TAG_DISPLAY[t])
+    .filter(Boolean);
+
+  // Parse description lines — split the rich tooltip text
+  const descLines = (spell.description ?? "").split("\n").filter(Boolean);
+  // First line is usually "Name — Cost | Type | Element", skip it if it matches
+  const headerLine = descLines[0] ?? "";
+  const hasHeaderLine = headerLine.includes("—") && headerLine.includes("|");
+  const bodyLines = hasHeaderLine ? descLines.slice(1) : descLines;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: "calc(100% + 12px)",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 100,
+        pointerEvents: "none",
+        display: "flex",
+        gap: 0,
+        filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.8))",
+      }}
+    >
+      {/* Main panel */}
+      <div
+        style={{
+          minWidth: 220,
+          maxWidth: 280,
+          background: "linear-gradient(180deg, #1a1e2e 0%, #12141f 100%)",
+          border: "2px solid #2a3050",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            padding: "8px 12px 6px",
+            background: "linear-gradient(180deg, #222840 0%, #1a1e2e 100%)",
+            borderBottom: "1px solid #2a3050",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: "#f0f0f0",
+              fontFamily: "monospace",
+              textTransform: "uppercase",
+              letterSpacing: 1,
+              marginBottom: 6,
+            }}
+          >
+            {spell.name}
+          </div>
+
+          {/* Element + cost badges */}
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+            {spell.element && <ElementBadge element={spell.element} />}
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+                padding: "1px 6px",
+                borderRadius: 3,
+                background: `${costColor}18`,
+                border: `1px solid ${costColor}44`,
+                fontSize: 10,
+                fontWeight: 700,
+                color: costColor,
+                fontFamily: "monospace",
+              }}
+            >
+              {costValue} {costLabel}
+            </span>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+                padding: "1px 6px",
+                borderRadius: 3,
+                background: "#ffffff0a",
+                border: "1px solid #ffffff18",
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#aaa",
+                fontFamily: "monospace",
+              }}
+            >
+              {rangeText} PO
+            </span>
+            {spell.baseDamage > 0 && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 3,
+                  padding: "1px 6px",
+                  borderRadius: 3,
+                  background: "#ef444418",
+                  border: "1px solid #ef444444",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#f87171",
+                  fontFamily: "monospace",
+                }}
+              >
+                {spell.baseDamage} DMG
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Body — description */}
+        <div style={{ padding: "8px 12px 10px" }}>
+          {bodyLines.map((line, i) => (
+            <div
+              key={i}
+              style={{
+                fontSize: 11,
+                color: "#c8c8d4",
+                fontFamily: "monospace",
+                lineHeight: 1.5,
+                marginBottom: i < bodyLines.length - 1 ? 2 : 0,
+              }}
+            >
+              {line}
+            </div>
+          ))}
+        </div>
+
+        {/* Tags */}
+        {displayTags.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              gap: 4,
+              flexWrap: "wrap",
+              padding: "0 12px 8px",
+              borderTop: "1px solid #1e2030",
+              paddingTop: 6,
+            }}
+          >
+            {displayTags.map((tag, i) => (
+              <span
+                key={i}
+                style={{
+                  fontSize: 9,
+                  fontWeight: 700,
+                  color: tag!.color,
+                  fontFamily: "monospace",
+                  padding: "1px 5px",
+                  background: `${tag!.color}15`,
+                  borderRadius: 3,
+                  border: `1px solid ${tag!.color}33`,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.3,
+                }}
+              >
+                {tag!.label}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Arrow */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: -6,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 12,
+          height: 6,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            width: 10,
+            height: 10,
+            background: "#12141f",
+            border: "2px solid #2a3050",
+            transform: "rotate(45deg)",
+            position: "absolute",
+            top: -6,
+            left: 1,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /* ── Spell slot ──────────────────────────────────── */
 
 function SpellSlot({
@@ -259,13 +539,15 @@ function SpellSlot({
   disabled,
   onSelect,
 }: {
-  spell: { name: string; range: number; cost: number; bloodPointCost?: number; mpCost?: number; element?: string; description?: string };
+  spell: { name: string; range: number; cost: number; baseDamage: number; rangeMin?: number; bloodPointCost?: number; mpCost?: number; element?: string; tags?: string[]; description?: string };
   index: number;
   isActive: boolean;
   canAfford: boolean;
   disabled: boolean;
   onSelect: () => void;
 }) {
+  const [hovered, setHovered] = useState(false);
+
   // Determine cost label
   const isBlood = (spell.bloodPointCost ?? 0) > 0;
   const isMp = (spell.mpCost ?? 0) > 0;
@@ -274,7 +556,6 @@ function SpellSlot({
     : isMp
       ? spell.mpCost!
       : spell.cost;
-  const costLabel = isBlood ? "PS" : isMp ? "PM" : "PA";
   const costBadgeColor = isBlood
     ? (canAfford ? "#dc2626" : "#333")
     : (canAfford ? "#2563eb" : "#333");
@@ -289,10 +570,15 @@ function SpellSlot({
   const accent = spell.element ? elementColor[spell.element] ?? "#2a2a3e" : "#2a2a3e";
 
   return (
+    <div
+      style={{ position: "relative" }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {hovered && <SpellTooltip spell={spell} />}
     <button
       onClick={onSelect}
       disabled={disabled}
-      title={spell.description ?? `${spell.name} — ${costValue} ${costLabel} — ${spell.range} PO`}
       style={{
         width: 48,
         height: 48,
@@ -365,10 +651,11 @@ function SpellSlot({
             fontFamily: "monospace",
           }}
         >
-          {costLabel}
+          {isBlood ? "PS" : "PM"}
         </div>
       )}
     </button>
+    </div>
   );
 }
 

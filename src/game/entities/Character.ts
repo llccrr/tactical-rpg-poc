@@ -88,6 +88,11 @@ export class Character extends Phaser.GameObjects.Graphics {
     this.hpBar.updateHp(hp, maxHp);
   }
 
+  /** Sync HP bar position to current sprite position */
+  syncHpBarPosition(): void {
+    this.hpBar.syncPosition(this.x, this.y);
+  }
+
   override destroy(fromScene?: boolean): void {
     this.hpBar.destroy(fromScene);
     super.destroy(fromScene);

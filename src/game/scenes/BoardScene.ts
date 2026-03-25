@@ -32,6 +32,7 @@ export class BoardScene extends Phaser.Scene {
   private enemySprites = new Map<string, Character>();
   private reachableKeys = new Set<string>();
   private spellRangeKeys = new Set<string>();
+  private enemyThreatKeys = new Set<string>();
   private onStateChange?: OnStateChange;
   private hoveredEnemyId: string | null = null;
 
@@ -97,6 +98,7 @@ export class BoardScene extends Phaser.Scene {
     this.enemySprites.clear();
     this.reachableKeys.clear();
     this.spellRangeKeys.clear();
+    this.enemyThreatKeys.clear();
     this.hoveredEnemyId = null;
     this.eventBus.clear();
 
@@ -206,11 +208,15 @@ export class BoardScene extends Phaser.Scene {
 
       sprite.on("pointerover", () => {
         this.hoveredEnemyId = id;
+        if (this.state.actionMode !== ActionMode.Targeting) {
+          this.showEnemyThreatZone(id);
+        }
         this.emitState();
       });
       sprite.on("pointerout", () => {
         if (this.hoveredEnemyId === id) {
           this.hoveredEnemyId = null;
+          this.clearEnemyThreatZone();
           this.emitState();
         }
       });
@@ -322,6 +328,34 @@ export class BoardScene extends Phaser.Scene {
       this.tileMap.get(key)?.setSpellRange(false);
     }
     this.spellRangeKeys.clear();
+  }
+
+  /** Show the potential movement zone of an enemy on hover */
+  private showEnemyThreatZone(enemyId: string): void {
+    this.clearEnemyThreatZone();
+    const enemy = this.state.enemies.find((e) => e.id === enemyId);
+    if (!enemy) return;
+
+    // Build blocked set: obstacles + other enemies + player position
+    // but exclude the hovered enemy itself (they move from their spot)
+    const blocked = getBlockedSet(this.state);
+    blocked.delete(posKey(enemy.pos));
+    blocked.add(posKey(this.state.character.pos));
+
+    const reachable = getReachableTiles(enemy.pos, enemy.moveRange, blocked);
+
+    for (const key of reachable.keys()) {
+      this.enemyThreatKeys.add(key);
+      this.tileMap.get(key)?.setEnemyThreat(true);
+    }
+  }
+
+  /** Clear enemy threat zone highlight */
+  private clearEnemyThreatZone(): void {
+    for (const key of this.enemyThreatKeys) {
+      this.tileMap.get(key)?.setEnemyThreat(false);
+    }
+    this.enemyThreatKeys.clear();
   }
 
   private async handleTileClick(pos: GridPos): Promise<void> {
@@ -446,6 +480,7 @@ export class BoardScene extends Phaser.Scene {
     const screen = gridToScreen(targetPos);
     this.character.setPosition(screen.x, screen.y);
     this.character.gridPos = targetPos;
+    this.character.syncHpBarPosition();
 
     this.eventBus.emit({ type: "info", message: `${spell.name} → téléportation` });
 

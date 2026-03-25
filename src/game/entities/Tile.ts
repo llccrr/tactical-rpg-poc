@@ -15,6 +15,8 @@ const COLORS = {
   spellRangeStroke: 0x66aaff,
   hover: 0x5588dd,
   hoverStroke: 0x77aaff,
+  enemyThreat: 0xcc4444,
+  enemyThreatStroke: 0xee6666,
 } as const;
 
 /**
@@ -29,6 +31,7 @@ export class Tile extends Phaser.GameObjects.Polygon {
   private baseStroke: number;
   private highlighted = false;
   private spellHighlighted = false;
+  private threatHighlighted = false;
 
   constructor(scene: Phaser.Scene, gridPos: GridPos, tileType: TileType) {
     const screen = gridToScreen(gridPos);
@@ -96,11 +99,29 @@ export class Tile extends Phaser.GameObjects.Polygon {
     }
   }
 
+  /** Show this tile as enemy threat zone */
+  setEnemyThreat(on: boolean): void {
+    this.threatHighlighted = on;
+    if (on) {
+      this.setFillStyle(COLORS.enemyThreat, 0.25);
+      this.setStrokeStyle(1.5, COLORS.enemyThreatStroke, 0.7);
+    } else if (this.spellHighlighted) {
+      this.setSpellRange(true);
+    } else if (this.highlighted) {
+      this.setReachable(true);
+    } else {
+      this.setFillStyle(this.baseColor, 1);
+      this.setStrokeStyle(1.5, this.baseStroke, 0.8);
+    }
+  }
+
   /** Hover feedback */
   setHover(on: boolean): void {
     if (on) {
       this.setFillStyle(COLORS.hover, 0.45);
       this.setStrokeStyle(2, COLORS.hoverStroke, 1);
+    } else if (this.threatHighlighted) {
+      this.setEnemyThreat(true);
     } else if (this.spellHighlighted) {
       this.setSpellRange(true);
     } else if (this.highlighted) {

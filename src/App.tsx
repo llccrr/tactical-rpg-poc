@@ -116,6 +116,7 @@ export default function App() {
     boardScene.setClassId(playerRef.current.classId);
     boardScene.setRoomConfig({ room: roomDef, playerHp: run.playerHp });
     boardScene.setEquipmentBonuses(getEquipmentBonuses(playerRef.current));
+    boardScene.setDungeonId(run.dungeonId);
     game.scene.add("BoardScene", boardScene, true);
 
     return () => {

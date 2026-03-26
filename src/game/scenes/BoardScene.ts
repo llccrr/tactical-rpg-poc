@@ -16,7 +16,8 @@ import { FightController } from "../core/fightController";
 import { CombatEventBus } from "../core/events";
 import { decideEnemyMove, decideEnemyAttack, decideEnemyFlee } from "../core/ai";
 import { getReachableTiles, findPath } from "../core/pathfinding";
-import { Tile, TILE_TEX_GRASS, TILE_TEX_TREE } from "../entities/Tile";
+import { Tile, TILE_TEX } from "../entities/Tile";
+import { getDungeonById, type Biome } from "../data/dungeons";
 import { Character } from "../entities/Character";
 import { EnemyCharacter, BLOB_TEX_IDLE, BLOB_TEX_WALK, BLOB_TEX_ATTACK, BLOB_TEX_HIT } from "../entities/EnemyCharacter";
 import { showDamagePopup } from "../entities/DamagePopup";
@@ -28,7 +29,15 @@ import blobRedHitUrl from "../../assets/sprites/blob_red_hit.png";
 import tileGrass0Url from "../../assets/sprites/tile_grass_0.png";
 import tileGrass1Url from "../../assets/sprites/tile_grass_1.png";
 import tileGrass2Url from "../../assets/sprites/tile_grass_2.png";
-import treeObstacleUrl from "../../assets/sprites/tree_obstacle.png";
+import tileCrypt0Url from "../../assets/sprites/tile_crypt_0.png";
+import tileCrypt1Url from "../../assets/sprites/tile_crypt_1.png";
+import tileCrypt2Url from "../../assets/sprites/tile_crypt_2.png";
+import tileSwamp0Url from "../../assets/sprites/tile_swamp_0.png";
+import tileSwamp1Url from "../../assets/sprites/tile_swamp_1.png";
+import tileSwamp2Url from "../../assets/sprites/tile_swamp_2.png";
+import tileFortress0Url from "../../assets/sprites/tile_fortress_0.png";
+import tileFortress1Url from "../../assets/sprites/tile_fortress_1.png";
+import tileFortress2Url from "../../assets/sprites/tile_fortress_2.png";
 import { IopLikeCombatEngine, getSpellDef } from "../core/ioplike";
 
 /** Callback shape for pushing state updates to React */
@@ -52,6 +61,7 @@ export class BoardScene extends Phaser.Scene {
   private classId = "ioplike";
   private roomConfig?: RoomConfig;
   private equipmentBonuses?: StatBonuses;
+  private dungeonId?: string;
 
   /** IopLike combat engine — only created when classId is "ioplike" */
   private iopEngine: IopLikeCombatEngine | null = null;
@@ -80,6 +90,19 @@ export class BoardScene extends Phaser.Scene {
     this.equipmentBonuses = bonuses;
   }
 
+  /** Set dungeon ID to determine biome tiles */
+  setDungeonId(id: string): void {
+    this.dungeonId = id;
+  }
+
+  private get biome(): Biome {
+    if (this.dungeonId) {
+      const dungeon = getDungeonById(this.dungeonId);
+      if (dungeon) return dungeon.biome;
+    }
+    return "grass";
+  }
+
   /** Return current player HP (useful to persist between rooms) */
   getPlayerHp(): number {
     return this.state?.character?.hp ?? 0;
@@ -96,10 +119,24 @@ export class BoardScene extends Phaser.Scene {
     this.load.image(BLOB_TEX_WALK, blobRedWalkUrl);
     this.load.image(BLOB_TEX_ATTACK, blobRedAttackUrl);
     this.load.image(BLOB_TEX_HIT, blobRedHitUrl);
-    this.load.image(TILE_TEX_GRASS[0], tileGrass0Url);
-    this.load.image(TILE_TEX_GRASS[1], tileGrass1Url);
-    this.load.image(TILE_TEX_GRASS[2], tileGrass2Url);
-    this.load.image(TILE_TEX_TREE, treeObstacleUrl);
+
+    // Grass biome
+    this.load.image(TILE_TEX.grass[0], tileGrass0Url);
+    this.load.image(TILE_TEX.grass[1], tileGrass1Url);
+    this.load.image(TILE_TEX.grass[2], tileGrass2Url);
+    // Crypt biome
+    this.load.image(TILE_TEX.crypt[0], tileCrypt0Url);
+    this.load.image(TILE_TEX.crypt[1], tileCrypt1Url);
+    this.load.image(TILE_TEX.crypt[2], tileCrypt2Url);
+    // Swamp biome
+    this.load.image(TILE_TEX.swamp[0], tileSwamp0Url);
+    this.load.image(TILE_TEX.swamp[1], tileSwamp1Url);
+    this.load.image(TILE_TEX.swamp[2], tileSwamp2Url);
+    // Fortress biome
+    this.load.image(TILE_TEX.fortress[0], tileFortress0Url);
+    this.load.image(TILE_TEX.fortress[1], tileFortress1Url);
+    this.load.image(TILE_TEX.fortress[2], tileFortress2Url);
+
   }
 
   create(): void {
@@ -310,7 +347,7 @@ export class BoardScene extends Phaser.Scene {
     for (let y = 0; y < GRID_ROWS; y++) {
       for (let x = 0; x < GRID_COLS; x++) {
         const tileType = this.state.tiles[y][x];
-        const tile = new Tile(this, { x, y }, tileType);
+        const tile = new Tile(this, { x, y }, tileType, this.biome);
         this.tileMap.set(posKey({ x, y }), tile);
 
         if (tileType !== TileType.Obstacle) {

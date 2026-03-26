@@ -9,11 +9,14 @@ export interface LootEntry {
   weight: number; // relative weight — higher = more likely
 }
 
+export type Biome = "grass" | "crypt" | "swamp" | "fortress";
+
 export interface DungeonDef {
   id: string;
   name: string;
   description: string;
   tier: number;
+  biome: Biome;
   rooms: RoomDef[];
   lootTable: LootEntry[];
 }
@@ -24,6 +27,7 @@ export const DUNGEONS: DungeonDef[] = [
     name: "Caverne des Gobelins",
     description: "Une caverne humide infestee de gobelins. L'odeur de rouille et de sueur emplit l'air.",
     tier: 1,
+    biome: "grass",
     rooms: [
       {
         enemies: [
@@ -56,6 +60,7 @@ export const DUNGEONS: DungeonDef[] = [
     name: "Crypte des Squelettes",
     description: "Une crypte ancienne ou des squelettes errent sans repos. L'air sent la poussiere et la mort.",
     tier: 1,
+    biome: "crypt",
     rooms: [
       {
         enemies: [
@@ -88,6 +93,7 @@ export const DUNGEONS: DungeonDef[] = [
     name: "Marais du Slime",
     description: "Un marecage visqueux peuple de slimes en tout genre. Chaque pas colle davantage.",
     tier: 2,
+    biome: "swamp",
     rooms: [
       {
         enemies: [
@@ -120,6 +126,7 @@ export const DUNGEONS: DungeonDef[] = [
     name: "Forteresse Demoniaque",
     description: "Une forteresse de basalte baignee de flammes. Les demons y regnent en maitres absolus.",
     tier: 3,
+    biome: "fortress",
     rooms: [
       {
         enemies: [

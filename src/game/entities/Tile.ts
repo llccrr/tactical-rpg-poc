@@ -3,10 +3,18 @@ import { TILE_WIDTH, TILE_HEIGHT } from "../config";
 import { gridToScreen } from "../core/iso";
 import type { GridPos } from "../core/grid";
 import { TileType } from "../core/gameState";
+import type { Biome } from "../data/dungeons";
 
-/** Texture keys loaded in BoardScene.preload */
-export const TILE_TEX_GRASS = ["tile_grass_0", "tile_grass_1", "tile_grass_2"] as const;
-export const TILE_TEX_TREE = "tree_obstacle";
+/** Texture keys per biome — 3 variants each */
+export const TILE_TEX: Record<Biome, readonly [string, string, string]> = {
+  grass:    ["tile_grass_0", "tile_grass_1", "tile_grass_2"],
+  crypt:    ["tile_crypt_0", "tile_crypt_1", "tile_crypt_2"],
+  swamp:    ["tile_swamp_0", "tile_swamp_1", "tile_swamp_2"],
+  fortress: ["tile_fortress_0", "tile_fortress_1", "tile_fortress_2"],
+};
+
+/** Kept for backward compat — default grass */
+export const TILE_TEX_GRASS = TILE_TEX.grass;
 
 /** Diamond half-dimensions */
 const HW = TILE_WIDTH / 2;
@@ -46,33 +54,49 @@ export class Tile extends Phaser.GameObjects.Container {
   private threatHighlighted = false;
   private _hover = false;
 
-  constructor(scene: Phaser.Scene, gridPos: GridPos, tileType: TileType) {
+  constructor(scene: Phaser.Scene, gridPos: GridPos, tileType: TileType, biome: Biome = "grass") {
     const screen = gridToScreen(gridPos);
     super(scene, screen.x, screen.y);
 
     this.gridPos = gridPos;
     this.tileType = tileType;
 
-    // Pick a grass variant based on grid position for visual variety
-    const grassIdx = (gridPos.x + gridPos.y * 3) % TILE_TEX_GRASS.length;
-    const grassKey = TILE_TEX_GRASS[grassIdx];
+    // Pick a tile variant based on grid position for visual variety
+    const texKeys = TILE_TEX[biome];
+    const variantIdx = (gridPos.x + gridPos.y * 3) % texKeys.length;
+    const grassKey = texKeys[variantIdx];
 
-    // Grass block sprite
-    const grass = scene.add.image(0, 0, grassKey);
-    const scaleX = TILE_WIDTH / grass.width;
-    const scaleY = TILE_HEIGHT / (grass.height * 0.5);
-    const scale = Math.max(scaleX, scaleY);
-    grass.setScale(scale);
-    grass.setOrigin(0.5, 0.35);
-    this.add(grass);
-
-    // Tree on obstacle tiles
-    if (tileType === TileType.Obstacle) {
-      const tree = scene.add.image(0, 0, TILE_TEX_TREE);
-      const treeScale = (TILE_HEIGHT * 2.2) / tree.height;
-      tree.setScale(treeScale);
-      tree.setOrigin(0.5, 0.85);
-      this.add(tree);
+    if (tileType !== TileType.Obstacle) {
+      // Terrain block sprite
+      const grass = scene.add.image(0, 0, grassKey);
+      const scaleX = TILE_WIDTH / grass.width;
+      const scaleY = TILE_HEIGHT / (grass.height * 0.5);
+      const scale = Math.max(scaleX, scaleY);
+      grass.setScale(scale);
+      grass.setOrigin(0.5, 0.35);
+      this.add(grass);
+    } else {
+      // Hole/pit for obstacle tiles
+      const hole = scene.add.graphics();
+      hole.fillStyle(0x0a0008, 0.85);
+      hole.beginPath();
+      hole.moveTo(0, -HH);
+      hole.lineTo(HW, 0);
+      hole.lineTo(0, HH);
+      hole.lineTo(-HW, 0);
+      hole.closePath();
+      hole.fillPath();
+      // Subtle inner shadow
+      hole.fillStyle(0x220011, 0.5);
+      const s = 0.6;
+      hole.beginPath();
+      hole.moveTo(0, -HH * s);
+      hole.lineTo(HW * s, 0);
+      hole.lineTo(0, HH * s);
+      hole.lineTo(-HW * s, 0);
+      hole.closePath();
+      hole.fillPath();
+      this.add(hole);
     }
 
     this.setDepth(0);

@@ -849,7 +849,8 @@ export class BoardScene extends Phaser.Scene {
 
       const spell = decideEnemyAttack(enemy, this.state.character.pos);
       if (spell) {
-        // Play attack animation before applying damage
+        // Face toward the player and play attack animation
+        sprite.faceToward(this.state.character.pos);
         await sprite.playAttackAnimation(this);
 
         const { damage } = computeDamage(

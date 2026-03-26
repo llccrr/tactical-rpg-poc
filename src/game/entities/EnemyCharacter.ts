@@ -148,6 +148,11 @@ export class EnemyCharacter extends Phaser.GameObjects.Container {
     });
   }
 
+  /** Face toward a target grid position */
+  faceToward(target: GridPos): void {
+    this.updateFacing(this.gridPos, target);
+  }
+
   /** Play attack animation: swap to jump texture, bounce up, then back to idle */
   playAttackAnimation(scene: Phaser.Scene): Promise<void> {
     return new Promise((resolve) => {
@@ -169,6 +174,19 @@ export class EnemyCharacter extends Phaser.GameObjects.Container {
     });
   }
 
+  /** Flip sprite based on movement direction in grid space.
+   *  Default (scaleX > 0) faces bottom-left; flipped (scaleX < 0) faces bottom-right. */
+  private updateFacing(from: GridPos, to: GridPos): void {
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    // In iso: moving +x or -y means heading screen-right → flip
+    if (dx > 0 || dy < 0) {
+      this.sprite.setFlipX(true);
+    } else if (dx < 0 || dy > 0) {
+      this.sprite.setFlipX(false);
+    }
+  }
+
   /** Move along grid path with walk texture and smooth easing */
   async moveAlongPath(scene: Phaser.Scene, path: GridPos[]): Promise<void> {
     this.isMoving = true;
@@ -176,6 +194,8 @@ export class EnemyCharacter extends Phaser.GameObjects.Container {
     const len = path.length;
 
     for (let i = 0; i < len; i++) {
+      const prevPos = i === 0 ? this.gridPos : path[i - 1];
+      this.updateFacing(prevPos, path[i]);
       const target = gridToScreen(path[i]);
 
       let ease: string;

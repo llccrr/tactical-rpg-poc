@@ -34,7 +34,11 @@
       "Bash(dpkg -l)",
       "Bash(ls /home/loic/dev/tactical-rpg-poc/test-*.mjs)",
       "Bash(ls /home/loic/dev/tactical-rpg-poc/src/*.js /home/loic/dev/tactical-rpg-poc/src/**/*.js)",
-      "Bash(ls test-*.mjs)"
+      "Bash(ls test-*.mjs)",
+      "Bash(python3 -c \"from PIL import Image; img = Image.open\\(''''/Users/llccrr/dev/tactical-rpg-poc/Isometric Asset - Lite/Blob_Fluffy_Spritesheed_Red.png''''\\); print\\(f''''Size: {img.size}''''\\); print\\(f''''Mode: {img.mode}''''\\)\")",
+      "Bash(sips -g all '/Users/llccrr/dev/tactical-rpg-poc/Isometric Asset - Lite/Blob_Fluffy_Spritesheed_Red.png')",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)"
     ]
   }
 }

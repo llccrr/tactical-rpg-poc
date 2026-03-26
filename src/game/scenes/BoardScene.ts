@@ -17,9 +17,13 @@ import { CombatEventBus } from "../core/events";
 import { decideEnemyMove, decideEnemyAttack, decideEnemyFlee } from "../core/ai";
 import { getReachableTiles, findPath } from "../core/pathfinding";
 import { Tile } from "../entities/Tile";
-import { Character, ENEMY_COLORS } from "../entities/Character";
+import { Character } from "../entities/Character";
+import { EnemyCharacter, BLOB_TEX_IDLE, BLOB_TEX_WALK, BLOB_TEX_ATTACK } from "../entities/EnemyCharacter";
 import { showDamagePopup } from "../entities/DamagePopup";
 import { gridToScreen } from "../core/iso";
+import blobRedUrl from "../../assets/sprites/blob_red.png";
+import blobRedWalkUrl from "../../assets/sprites/blob_red_walk.png";
+import blobRedAttackUrl from "../../assets/sprites/blob_red_attack.png";
 import { IopLikeCombatEngine, getSpellDef } from "../core/ioplike";
 
 /** Callback shape for pushing state updates to React */
@@ -29,7 +33,7 @@ export class BoardScene extends Phaser.Scene {
   private state!: GameState;
   private tileMap = new Map<string, Tile>();
   private character!: Character;
-  private enemySprites = new Map<string, Character>();
+  private enemySprites = new Map<string, EnemyCharacter>();
   private reachableKeys = new Set<string>();
   private pathPreviewKeys = new Set<string>();
   private spellRangeKeys = new Set<string>();
@@ -80,6 +84,12 @@ export class BoardScene extends Phaser.Scene {
   startFight(classId: string): void {
     this.classId = classId;
     this.resetBoard();
+  }
+
+  preload(): void {
+    this.load.image(BLOB_TEX_IDLE, blobRedUrl);
+    this.load.image(BLOB_TEX_WALK, blobRedWalkUrl);
+    this.load.image(BLOB_TEX_ATTACK, blobRedAttackUrl);
   }
 
   create(): void {
@@ -235,7 +245,7 @@ export class BoardScene extends Phaser.Scene {
 
   private createEnemySprites(): void {
     for (const enemy of this.state.enemies) {
-      const sprite = new Character(this, enemy.pos, ENEMY_COLORS);
+      const sprite = new EnemyCharacter(this, enemy.pos);
       const id = enemy.id;
 
       sprite.on("pointerover", () => {
@@ -839,6 +849,9 @@ export class BoardScene extends Phaser.Scene {
 
       const spell = decideEnemyAttack(enemy, this.state.character.pos);
       if (spell) {
+        // Play attack animation before applying damage
+        await sprite.playAttackAnimation(this);
+
         const { damage } = computeDamage(
           enemy,
           this.state.character,

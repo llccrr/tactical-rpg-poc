@@ -8,6 +8,7 @@ import { HpBar } from "./HpBar";
 export const BLOB_TEX_IDLE = "blob_red";
 export const BLOB_TEX_WALK = "blob_red_walk";
 export const BLOB_TEX_ATTACK = "blob_red_attack";
+export const BLOB_TEX_HIT = "blob_red_hit";
 
 /** Target display size for the enemy sprite on the board */
 const SPRITE_DISPLAY_H = TILE_HEIGHT * 1.4;
@@ -42,18 +43,16 @@ export class EnemyCharacter extends Phaser.GameObjects.Container {
 
     this.add(this.sprite);
 
+    // Make the sprite itself interactive (pixel-perfect with its displayed bounds)
+    this.sprite.setInteractive({ useHandCursor: true });
+    // Relay sprite events to the container so BoardScene listeners work
+    this.sprite.on("pointerover", () => this.emit("pointerover"));
+    this.sprite.on("pointerout", () => this.emit("pointerout"));
+    this.sprite.on("pointerdown", (p: Phaser.Input.Pointer) => this.emit("pointerdown", p));
+
     // HP bar
     this.hpBar = new HpBar(scene);
     this.hpBar.syncPosition(screen.x, screen.y);
-
-    // Hit area covering the sprite
-    const hitW = this.sprite.displayWidth + 4;
-    const hitH = this.sprite.displayHeight + 4;
-    this.setSize(hitW, hitH);
-    this.setInteractive(
-      new Phaser.Geom.Rectangle(-hitW / 2, -hitH * 0.85, hitW, hitH),
-      Phaser.Geom.Rectangle.Contains,
-    );
 
     scene.add.existing(this);
   }
@@ -92,10 +91,12 @@ export class EnemyCharacter extends Phaser.GameObjects.Container {
     this.sprite.setScale(scale);
   }
 
-  /** Quick shake + flash on hit, with attack texture */
+  /** Quick shake + flash on hit, swap to hurt texture then back to idle */
   playHitReaction(scene: Phaser.Scene): void {
     const baseX = this.x;
     const baseY = this.y;
+
+    this.setTexture(BLOB_TEX_HIT);
 
     scene.tweens.add({
       targets: this,
@@ -108,6 +109,7 @@ export class EnemyCharacter extends Phaser.GameObjects.Container {
       onComplete: () => {
         this.setPosition(baseX, baseY);
         this.hpBar.syncPosition(baseX, baseY);
+        this.setTexture(this.idleTexture);
       },
     });
 

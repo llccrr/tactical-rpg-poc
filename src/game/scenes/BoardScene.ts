@@ -16,14 +16,19 @@ import { FightController } from "../core/fightController";
 import { CombatEventBus } from "../core/events";
 import { decideEnemyMove, decideEnemyAttack, decideEnemyFlee } from "../core/ai";
 import { getReachableTiles, findPath } from "../core/pathfinding";
-import { Tile } from "../entities/Tile";
+import { Tile, TILE_TEX_GRASS, TILE_TEX_TREE } from "../entities/Tile";
 import { Character } from "../entities/Character";
-import { EnemyCharacter, BLOB_TEX_IDLE, BLOB_TEX_WALK, BLOB_TEX_ATTACK } from "../entities/EnemyCharacter";
+import { EnemyCharacter, BLOB_TEX_IDLE, BLOB_TEX_WALK, BLOB_TEX_ATTACK, BLOB_TEX_HIT } from "../entities/EnemyCharacter";
 import { showDamagePopup } from "../entities/DamagePopup";
 import { gridToScreen } from "../core/iso";
 import blobRedUrl from "../../assets/sprites/blob_red.png";
 import blobRedWalkUrl from "../../assets/sprites/blob_red_walk.png";
 import blobRedAttackUrl from "../../assets/sprites/blob_red_attack.png";
+import blobRedHitUrl from "../../assets/sprites/blob_red_hit.png";
+import tileGrass0Url from "../../assets/sprites/tile_grass_0.png";
+import tileGrass1Url from "../../assets/sprites/tile_grass_1.png";
+import tileGrass2Url from "../../assets/sprites/tile_grass_2.png";
+import treeObstacleUrl from "../../assets/sprites/tree_obstacle.png";
 import { IopLikeCombatEngine, getSpellDef } from "../core/ioplike";
 
 /** Callback shape for pushing state updates to React */
@@ -90,6 +95,11 @@ export class BoardScene extends Phaser.Scene {
     this.load.image(BLOB_TEX_IDLE, blobRedUrl);
     this.load.image(BLOB_TEX_WALK, blobRedWalkUrl);
     this.load.image(BLOB_TEX_ATTACK, blobRedAttackUrl);
+    this.load.image(BLOB_TEX_HIT, blobRedHitUrl);
+    this.load.image(TILE_TEX_GRASS[0], tileGrass0Url);
+    this.load.image(TILE_TEX_GRASS[1], tileGrass1Url);
+    this.load.image(TILE_TEX_GRASS[2], tileGrass2Url);
+    this.load.image(TILE_TEX_TREE, treeObstacleUrl);
   }
 
   create(): void {

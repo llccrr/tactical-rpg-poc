@@ -1,4 +1,5 @@
 import { getItemById, type StatBonuses } from "../data/items";
+import { ELEMENTS, clampResistance, type Element } from "../data/elements";
 
 export interface PlayerState {
   classId: string;
@@ -68,12 +69,29 @@ export function unequipSlot(state: PlayerState, slot: string): PlayerState {
 /** Sum all stat bonuses from equipped items. */
 export function getEquipmentBonuses(state: PlayerState): StatBonuses {
   const bonuses: StatBonuses = {};
+  const resistances: Partial<Record<Element, number>> = {};
+
   for (const itemId of Object.values(state.equipment)) {
     const item = getItemById(itemId);
     if (!item) continue;
     if (item.bonuses.attack) bonuses.attack = (bonuses.attack ?? 0) + item.bonuses.attack;
-    if (item.bonuses.defense) bonuses.defense = (bonuses.defense ?? 0) + item.bonuses.defense;
     if (item.bonuses.hp) bonuses.hp = (bonuses.hp ?? 0) + item.bonuses.hp;
+    if (item.bonuses.resistances) {
+      for (const el of ELEMENTS) {
+        const add = item.bonuses.resistances[el];
+        if (add != null) resistances[el] = (resistances[el] ?? 0) + add;
+      }
+    }
   }
+
+  let hasResistance = false;
+  for (const el of ELEMENTS) {
+    if (resistances[el] != null) {
+      resistances[el] = clampResistance(resistances[el]!);
+      hasResistance = true;
+    }
+  }
+  if (hasResistance) bonuses.resistances = resistances;
+
   return bonuses;
 }

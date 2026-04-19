@@ -30,7 +30,6 @@ function StatSummary({ player }: { player: PlayerState }) {
   const stats = [
     { label: "PV", base: classDef.baseHp, bonus: bonuses.hp ?? 0, color: "#dc2626" },
     { label: "ATK", base: classDef.baseAttack, bonus: bonuses.attack ?? 0, color: "#60a5fa" },
-    { label: "DEF", base: classDef.baseDefense, bonus: bonuses.defense ?? 0, color: "#4ade80" },
   ];
 
   return (

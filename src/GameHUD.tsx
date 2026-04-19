@@ -154,12 +154,11 @@ function PointCounter({
 /* ── Element badges ──────────────────────────────── */
 
 const ELEMENT_META: Record<string, { label: string; color: string; icon: string }> = {
-  air: { label: "Air", color: "#7dd3fc", icon: "💨" },
-  wind: { label: "Vent", color: "#a3e635", icon: "💨" },
-  water: { label: "Eau", color: "#60a5fa", icon: "💧" },
-  earth: { label: "Terre", color: "#a16207", icon: "🪨" },
-  fire: { label: "Feu", color: "#fb923c", icon: "🔥" },
-  neutral: { label: "Neutre", color: "#a1a1aa", icon: "⚔️" },
+  feu: { label: "Feu", color: "#fb923c", icon: "🔥" },
+  eau: { label: "Eau", color: "#60a5fa", icon: "💧" },
+  vent: { label: "Vent", color: "#a3e635", icon: "🌪️" },
+  terre: { label: "Terre", color: "#a16207", icon: "🌱" },
+  neutre: { label: "Neutre", color: "#a1a1aa", icon: "⚔️" },
 };
 
 function ElementBadge({ element }: { element: string }) {
@@ -196,7 +195,7 @@ function SpellTooltip({
     name: string;
     range: number;
     cost: number;
-    baseDamage: number;
+    damagePercent: number;
     rangeMin?: number;
     element?: string;
     description?: string;
@@ -292,7 +291,7 @@ function SpellTooltip({
             >
               {rangeText} PO
             </span>
-            {spell.baseDamage > 0 && (
+            {spell.damagePercent > 0 && (
               <span
                 style={{
                   display: "inline-flex",
@@ -308,7 +307,7 @@ function SpellTooltip({
                   fontFamily: "monospace",
                 }}
               >
-                {spell.baseDamage} DMG
+                {spell.damagePercent}%
               </span>
             )}
           </div>
@@ -371,7 +370,7 @@ function SpellSlot({
   disabled,
   onSelect,
 }: {
-  spell: { name: string; range: number; cost: number; baseDamage: number; rangeMin?: number; element?: string; description?: string };
+  spell: { name: string; range: number; cost: number; damagePercent: number; rangeMin?: number; element?: string; description?: string };
   isActive: boolean;
   canAfford: boolean;
   disabled: boolean;
@@ -380,12 +379,11 @@ function SpellSlot({
   const [hovered, setHovered] = useState(false);
 
   const elementColor: Record<string, string> = {
-    air: "#7dd3fc",
-    wind: "#a3e635",
-    water: "#60a5fa",
-    earth: "#a16207",
-    fire: "#fb923c",
-    neutral: "#a1a1aa",
+    feu: "#fb923c",
+    eau: "#60a5fa",
+    vent: "#a3e635",
+    terre: "#a16207",
+    neutre: "#a1a1aa",
   };
   const accent = spell.element ? elementColor[spell.element] ?? "#2a2a3e" : "#2a2a3e";
 
@@ -767,7 +765,6 @@ export function EnemyTooltip({ state }: { state: GameState | null }) {
 
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <StatPill label="ATQ" value={enemy.attack} color="#fb923c" />
-            <StatPill label="DEF" value={enemy.defense} color="#60a5fa" />
             <StatPill label="PP" value={enemy.moveRange} color="#facc15" />
             <StatPill label="PA" value={enemy.ap} color="#a78bfa" />
           </div>
@@ -788,7 +785,7 @@ export function EnemyTooltip({ state }: { state: GameState | null }) {
                     border: "1px solid #ffffff15",
                   }}
                 >
-                  {s.name} ({s.baseDamage}dmg, {s.range}po)
+                  {s.name} ({s.damagePercent}%, {s.range}po)
                 </span>
               ))}
             </div>

@@ -115,7 +115,7 @@ function scoreBoss(pos: GridPos, playerPos: GridPos, enemy: EnemyState): number 
   // Find best usable spell at this position
   const bestSpell = enemy.spells
     .filter((s) => dist <= s.range)
-    .sort((a, b) => b.baseDamage - a.baseDamage)[0];
+    .sort((a, b) => b.damagePercent - a.damagePercent)[0];
 
   if (bestSpell) {
     // In range of a spell — prefer to stay at max range of that spell
@@ -189,7 +189,7 @@ export function decideEnemyAttack(
       // Prefer highest damage spell the boss can afford
       return inRange
         .filter((s) => s.cost <= enemy.ap)
-        .sort((a, b) => b.baseDamage - a.baseDamage)[0] ?? null;
+        .sort((a, b) => b.damagePercent - a.damagePercent)[0] ?? null;
     case "melee":
     case "tank":
     default:

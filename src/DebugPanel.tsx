@@ -1,5 +1,12 @@
 import type { GameState, EnemyState } from "./game/core/gameState";
 import { ActionMode } from "./game/core/gameState";
+import {
+  ELEMENTS,
+  ELEMENT_COLORS,
+  ELEMENT_ICONS,
+  ELEMENT_LABELS,
+  type Element,
+} from "./game/data/elements";
 
 interface DebugPanelProps {
   state: GameState | null;
@@ -177,13 +184,13 @@ export function DebugPanel({
             <strong>HP:</strong> {hoveredEnemy.hp} / {hoveredEnemy.maxHp}
           </div>
           <div>
-            <strong>ATK:</strong> {hoveredEnemy.attack}{" "}
-            <strong>DEF:</strong> {hoveredEnemy.defense}
+            <strong>ATK:</strong> {hoveredEnemy.attack}
           </div>
           <div>
             <strong>PM:</strong> {hoveredEnemy.moveRange}{" "}
             <strong>PA:</strong> {hoveredEnemy.ap}
           </div>
+          <EnemyResistances enemy={hoveredEnemy} />
         </>
       )}
 
@@ -230,6 +237,49 @@ export function DebugPanel({
         >
           Reset Board
         </button>
+      </div>
+    </div>
+  );
+}
+
+function EnemyResistances({ enemy }: { enemy: EnemyState }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 3, marginTop: 4 }}>
+      <div style={{ color: "#666", fontSize: 11, textTransform: "uppercase", letterSpacing: 1 }}>
+        R\u00e9sistances
+      </div>
+      <div style={{ display: "flex", gap: 3 }}>
+        {ELEMENTS.map((el: Element) => {
+          const pct = Math.round((enemy.resistances[el] ?? 0) * 100);
+          const dim = pct === 0;
+          return (
+            <div
+              key={el}
+              title={`${ELEMENT_LABELS[el]} : ${pct}%`}
+              style={{
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                padding: "2px 0",
+                borderRadius: 3,
+                background: dim ? "#12121c" : `${ELEMENT_COLORS[el]}11`,
+                border: `1px solid ${dim ? "#1a1a2a" : ELEMENT_COLORS[el] + "44"}`,
+              }}
+            >
+              <span style={{ fontSize: 11 }}>{ELEMENT_ICONS[el]}</span>
+              <span
+                style={{
+                  color: dim ? "#555" : ELEMENT_COLORS[el],
+                  fontSize: 10,
+                  fontWeight: 700,
+                }}
+              >
+                {pct}%
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

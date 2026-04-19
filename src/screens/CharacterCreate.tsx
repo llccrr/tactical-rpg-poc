@@ -63,7 +63,6 @@ function ClassCard({
       >
         <Stat label="HP" value={cls.baseHp} color="#cc4444" />
         <Stat label="ATK" value={cls.baseAttack} color="#ee8833" />
-        <Stat label="DEF" value={cls.baseDefense} color="#4488ee" />
         <Stat label="PM" value={cls.basePm} color="#44cc88" />
       </div>
 
@@ -87,7 +86,7 @@ function ClassCard({
           >
             <span>{spell.name}</span>
             <span style={{ color: "#888" }}>
-              {spell.range} PO | {spell.cost} PA | {spell.baseDamage} dmg
+              {spell.range} PO | {spell.cost} PA | {spell.damagePercent}% {spell.element}
             </span>
           </div>
         ))}

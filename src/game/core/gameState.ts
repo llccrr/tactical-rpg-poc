@@ -6,6 +6,8 @@ import { getClassById } from "../data/classes";
 import { makeEnemy } from "../data/enemies";
 import type { RoomDef } from "../data/dungeons";
 import type { StatBonuses } from "../data/items";
+import type { Element, Resistances } from "../data/elements";
+import { makeResistances } from "../data/elements";
 
 export enum TileType {
   Empty = "empty",
@@ -17,13 +19,21 @@ export enum ActionMode {
   Targeting = "targeting",
 }
 
+/**
+ * D\u00e9finition d'un sort. Les d\u00e9g\u00e2ts sont exprim\u00e9s en pourcentage de
+ * WEAPON_BASE_DAMAGE (spec : arme = 10). L'\u00e9l\u00e9ment et le type (direct /
+ * indirect) sont obligatoires ; les sorts indirects (DoT, stacks) ne g\u00e9n\u00e8rent
+ * pas de PS et ne d\u00e9clenchent pas Rage.
+ */
 export interface Spell {
   name: string;
   range: number;
   cost: number; // PA cost
-  baseDamage: number;
+  /** Pourcentage de d\u00e9g\u00e2ts d'arme (100 = 1\u00d7 l'arme = 10 d\u00e9g\u00e2ts bruts). */
+  damagePercent: number;
+  element: Element;
+  damageType?: "direct" | "indirect";
   rangeMin?: number;
-  element?: string;
   description?: string;
 }
 
@@ -32,7 +42,8 @@ export interface CharacterState {
   hp: number;
   maxHp: number;
   attack: number;
-  defense: number;
+  /** R\u00e9sistances par \u00e9l\u00e9ment (0..0.7). Appliqu\u00e9es en \u00e9tape 5 du calcul. */
+  resistances: Resistances;
   /** PP gained at the start of each player turn (spec : 4) */
   moveRange: number;
   /** PA gained at the start of each player turn (spec : 1) */
@@ -52,7 +63,8 @@ export interface EnemyState {
   hp: number;
   maxHp: number;
   attack: number;
-  defense: number;
+  /** R\u00e9sistances par \u00e9l\u00e9ment (0..0.7). */
+  resistances: Resistances;
   moveRange: number;
   ap: number;
   spells: Spell[];
@@ -130,7 +142,10 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig, bon
       hp: startHp,
       maxHp,
       attack: classDef.baseAttack + (bonuses?.attack ?? 0),
-      defense: classDef.baseDefense + (bonuses?.defense ?? 0),
+      resistances: makeResistances({
+        ...classDef.resistances,
+        ...bonuses?.resistances,
+      }),
       moveRange: classDef.basePm,
       ap: classDef.basePa,
       pf: classDef.basePf,

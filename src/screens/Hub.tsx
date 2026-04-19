@@ -3,6 +3,14 @@ import { getResourceById, RESOURCES } from "../game/data/resources";
 import { getItemById, type ItemSlot } from "../game/data/items";
 import { getClassById } from "../game/data/classes";
 import { getEquipmentBonuses, unequipSlot, equipItem, type PlayerState } from "../game/core/playerState";
+import {
+  ELEMENTS,
+  ELEMENT_COLORS,
+  ELEMENT_ICONS,
+  clampResistance,
+  type Element,
+  type Resistances,
+} from "../game/data/elements";
 
 interface Props {
   player: PlayerState;
@@ -196,7 +204,58 @@ function StatBar({
   );
 }
 
-/* ── Dungeon node on the map ─────────────────────────────── */
+function ResistanceSummary({
+  bonuses,
+  classResistances,
+}: {
+  bonuses?: Partial<Resistances>;
+  classResistances?: Partial<Resistances>;
+}) {
+  const totals: Record<Element, number> = {} as Record<Element, number>;
+  for (const el of ELEMENTS) {
+    const base = classResistances?.[el] ?? 0;
+    const bonus = bonuses?.[el] ?? 0;
+    totals[el] = clampResistance(base + bonus);
+  }
+  return (
+    <div style={{ display: "flex", gap: 4, marginTop: 4, justifyContent: "space-between" }}>
+      {ELEMENTS.map((el) => {
+        const pct = Math.round(totals[el] * 100);
+        const dim = pct === 0;
+        return (
+          <div
+            key={el}
+            title={`R\u00e9sistance ${el} : ${pct}%`}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              flex: 1,
+              padding: "2px 0",
+              borderRadius: 4,
+              background: dim ? "#0b0b12" : `${ELEMENT_COLORS[el]}11`,
+              border: `1px solid ${dim ? "#1a1a2a" : ELEMENT_COLORS[el] + "44"}`,
+            }}
+          >
+            <span style={{ fontSize: 11 }}>{ELEMENT_ICONS[el]}</span>
+            <span
+              style={{
+                color: dim ? "#555" : ELEMENT_COLORS[el],
+                fontFamily: "monospace",
+                fontSize: 10,
+                fontWeight: 700,
+              }}
+            >
+              {pct}%
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* \u2500\u2500 Dungeon node on the map \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
 
 /** Dungeon positions on the visual map (percentage-based) */
 const DUNGEON_MAP_POSITIONS: Record<string, { x: number; y: number }> = {
@@ -469,9 +528,9 @@ export function Hub({ player, completedDungeons, onPlayerChange, onStartDungeon,
               <>
                 <StatBar label="PV" base={classDef.baseHp} bonus={bonuses.hp ?? 0} color="#dc2626" />
                 <StatBar label="ATK" base={classDef.baseAttack} bonus={bonuses.attack ?? 0} color="#60a5fa" />
-                <StatBar label="DEF" base={classDef.baseDefense} bonus={bonuses.defense ?? 0} color="#4ade80" />
                 <StatBar label="PM" base={classDef.basePm} bonus={0} color="#c084fc" />
                 <StatBar label="PA" base={classDef.basePa} bonus={0} color="#facc15" />
+                <ResistanceSummary bonuses={bonuses.resistances} classResistances={classDef.resistances} />
               </>
             )}
           </div>

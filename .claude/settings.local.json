@@ -39,7 +39,14 @@
       "Bash(grep -r \"dialogue\\\\|quest\\\\|story\\\\|narrative\\\\|text\\\\|message\" /home/loic/dev/tactical-rpg-poc/src --include=*.ts --include=*.tsx -l)",
       "mcp__notion__notion-search",
       "mcp__notion__*",
-      "Bash(grep '\\\\.js$')"
+      "Bash(grep '\\\\.js$')",
+      "Bash(python3 -c \"from PIL import Image; img = Image.open\\(''''/Users/llccrr/dev/tactical-rpg-poc/Isometric Asset - Lite/Blob_Fluffy_Spritesheed_Red.png''''\\); print\\(f''''Size: {img.size}''''\\); print\\(f''''Mode: {img.mode}''''\\)\")",
+      "Bash(sips -g all '/Users/llccrr/dev/tactical-rpg-poc/Isometric Asset - Lite/Blob_Fluffy_Spritesheed_Red.png')",
+      "Bash(python3:*)",
+      "Bash(pip3 install:*)",
+      "Bash(find /Users/llccrr/dev/tactical-rpg-poc -type f -name *gameState* -o -name *game-state*)",
+      "Bash(grep -r \"crypt\\\\|swamp\\\\|fortress\\\\|goblin cave\" /Users/llccrr/dev/tactical-rpg-poc/src --include=*.ts --include=*.tsx)",
+      "Bash(grep -r \"TILE_TEX\\\\|texture.*key\\\\|preload\" /Users/llccrr/dev/tactical-rpg-poc/src --include=*.ts)"
     ]
   }
 }

@@ -2,7 +2,7 @@ import type { GameState, EnemyState } from "./game/core/gameState";
 import { ActionMode } from "./game/core/gameState";
 
 interface DebugPanelProps {
-  state: (GameState & { hoveredEnemyId: string | null }) | null;
+  state: GameState | null;
   onReset: () => void;
   onSelectSpell: (index: number) => void;
   onEndTurn: () => void;

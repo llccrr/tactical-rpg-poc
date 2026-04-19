@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { GRID_COLS, GRID_ROWS } from "../config";
+import { GRID_COLS, GRID_ROWS, DPR } from "../config";
 import { posKey } from "../core/grid";
 import type { GridPos } from "../core/grid";
 import {
@@ -16,10 +16,28 @@ import { FightController } from "../core/fightController";
 import { CombatEventBus } from "../core/events";
 import { decideEnemyMove, decideEnemyAttack, decideEnemyFlee } from "../core/ai";
 import { getReachableTiles, findPath } from "../core/pathfinding";
-import { Tile } from "../entities/Tile";
-import { Character, ENEMY_COLORS } from "../entities/Character";
+import { Tile, TILE_TEX } from "../entities/Tile";
+import { getDungeonById, type Biome } from "../data/dungeons";
+import { Character } from "../entities/Character";
+import { EnemyCharacter, BLOB_TEX_IDLE, BLOB_TEX_WALK, BLOB_TEX_ATTACK, BLOB_TEX_HIT } from "../entities/EnemyCharacter";
 import { showDamagePopup } from "../entities/DamagePopup";
 import { gridToScreen } from "../core/iso";
+import blobRedUrl from "../../assets/sprites/blob_red.png";
+import blobRedWalkUrl from "../../assets/sprites/blob_red_walk.png";
+import blobRedAttackUrl from "../../assets/sprites/blob_red_attack.png";
+import blobRedHitUrl from "../../assets/sprites/blob_red_hit.png";
+import tileGrass0Url from "../../assets/sprites/tile_grass_0.png";
+import tileGrass1Url from "../../assets/sprites/tile_grass_1.png";
+import tileGrass2Url from "../../assets/sprites/tile_grass_2.png";
+import tileCrypt0Url from "../../assets/sprites/tile_crypt_0.png";
+import tileCrypt1Url from "../../assets/sprites/tile_crypt_1.png";
+import tileCrypt2Url from "../../assets/sprites/tile_crypt_2.png";
+import tileSwamp0Url from "../../assets/sprites/tile_swamp_0.png";
+import tileSwamp1Url from "../../assets/sprites/tile_swamp_1.png";
+import tileSwamp2Url from "../../assets/sprites/tile_swamp_2.png";
+import tileFortress0Url from "../../assets/sprites/tile_fortress_0.png";
+import tileFortress1Url from "../../assets/sprites/tile_fortress_1.png";
+import tileFortress2Url from "../../assets/sprites/tile_fortress_2.png";
 
 /** Callback shape for pushing state updates to React */
 export type OnStateChange = (state: GameState) => void;
@@ -28,17 +46,21 @@ export class BoardScene extends Phaser.Scene {
   private state!: GameState;
   private tileMap = new Map<string, Tile>();
   private character!: Character;
-  private enemySprites = new Map<string, Character>();
+  private enemySprites = new Map<string, EnemyCharacter>();
   private reachableKeys = new Set<string>();
+  private pathPreviewKeys = new Set<string>();
   private spellRangeKeys = new Set<string>();
+  private enemyThreatKeys = new Set<string>();
   private onStateChange?: OnStateChange;
   private hoveredEnemyId: string | null = null;
+  private enemyHoverTooltip: Phaser.GameObjects.Container | null = null;
 
   private fight!: FightController;
   private eventBus!: CombatEventBus;
   private classId = "bretteur";
   private roomConfig?: RoomConfig;
   private equipmentBonuses?: StatBonuses;
+  private dungeonId?: string;
 
   constructor() {
     super({ key: "BoardScene" });
@@ -64,6 +86,19 @@ export class BoardScene extends Phaser.Scene {
     this.equipmentBonuses = bonuses;
   }
 
+  /** Set dungeon ID to determine biome tiles */
+  setDungeonId(id: string): void {
+    this.dungeonId = id;
+  }
+
+  private get biome(): Biome {
+    if (this.dungeonId) {
+      const dungeon = getDungeonById(this.dungeonId);
+      if (dungeon) return dungeon.biome;
+    }
+    return "grass";
+  }
+
   /** Return current player HP (useful to persist between rooms) */
   getPlayerHp(): number {
     return this.state?.character?.hp ?? 0;
@@ -75,12 +110,38 @@ export class BoardScene extends Phaser.Scene {
     this.resetBoard();
   }
 
+  preload(): void {
+    this.load.image(BLOB_TEX_IDLE, blobRedUrl);
+    this.load.image(BLOB_TEX_WALK, blobRedWalkUrl);
+    this.load.image(BLOB_TEX_ATTACK, blobRedAttackUrl);
+    this.load.image(BLOB_TEX_HIT, blobRedHitUrl);
+
+    // Grass biome
+    this.load.image(TILE_TEX.grass[0], tileGrass0Url);
+    this.load.image(TILE_TEX.grass[1], tileGrass1Url);
+    this.load.image(TILE_TEX.grass[2], tileGrass2Url);
+    // Crypt biome
+    this.load.image(TILE_TEX.crypt[0], tileCrypt0Url);
+    this.load.image(TILE_TEX.crypt[1], tileCrypt1Url);
+    this.load.image(TILE_TEX.crypt[2], tileCrypt2Url);
+    // Swamp biome
+    this.load.image(TILE_TEX.swamp[0], tileSwamp0Url);
+    this.load.image(TILE_TEX.swamp[1], tileSwamp1Url);
+    this.load.image(TILE_TEX.swamp[2], tileSwamp2Url);
+    // Fortress biome
+    this.load.image(TILE_TEX.fortress[0], tileFortress0Url);
+    this.load.image(TILE_TEX.fortress[1], tileFortress1Url);
+    this.load.image(TILE_TEX.fortress[2], tileFortress2Url);
+
+  }
+
   create(): void {
     this.initFight();
     this.buildBoard();
     this.character = this.createPlayerCharacter();
     this.createEnemySprites();
     this.showReachable();
+    this.setupTargetingCancelInput();
     this.emitState();
   }
 
@@ -92,8 +153,11 @@ export class BoardScene extends Phaser.Scene {
     this.enemySprites.forEach((s) => s.destroy());
     this.enemySprites.clear();
     this.reachableKeys.clear();
+    this.pathPreviewKeys.clear();
     this.spellRangeKeys.clear();
+    this.enemyThreatKeys.clear();
     this.hoveredEnemyId = null;
+    this.hideEnemyMiniTooltip();
     this.eventBus.clear();
 
     this.initFight();
@@ -154,6 +218,33 @@ export class BoardScene extends Phaser.Scene {
 
   // ── internal ──────────────────────────────────────────────
 
+  /** Escape or click on empty canvas: exit spell targeting */
+  private setupTargetingCancelInput(): void {
+    const escKey = this.input.keyboard?.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+    escKey?.on("down", () => {
+      if (this.state.fightResult !== "ongoing") return;
+      if (!this.fight.isPlayerTurn()) return;
+      if (this.character.isMoving) return;
+      if (this.state.actionMode !== ActionMode.Targeting) return;
+      this.switchToMoveMode();
+      this.emitState();
+    });
+
+    this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (this.state.actionMode !== ActionMode.Targeting) return;
+      if (this.state.fightResult !== "ongoing") return;
+      if (!this.fight.isPlayerTurn()) return;
+      if (this.character.isMoving) return;
+      if (!pointer.leftButtonDown()) return;
+
+      const hits = this.input.hitTestPointer(pointer);
+      if (hits.length > 0) return;
+
+      this.switchToMoveMode();
+      this.emitState();
+    });
+  }
+
   private initFight(): void {
     this.state = createInitialState(this.classId, this.roomConfig, this.equipmentBonuses);
     this.eventBus = new CombatEventBus();
@@ -178,16 +269,22 @@ export class BoardScene extends Phaser.Scene {
 
   private createEnemySprites(): void {
     for (const enemy of this.state.enemies) {
-      const sprite = new Character(this, enemy.pos, ENEMY_COLORS);
+      const sprite = new EnemyCharacter(this, enemy.pos);
       const id = enemy.id;
 
       sprite.on("pointerover", () => {
         this.hoveredEnemyId = id;
+        if (this.state.actionMode !== ActionMode.Targeting) {
+          this.showEnemyThreatZone(id);
+        }
+        this.showEnemyMiniTooltip(id);
         this.emitState();
       });
       sprite.on("pointerout", () => {
         if (this.hoveredEnemyId === id) {
           this.hoveredEnemyId = null;
+          this.clearEnemyThreatZone();
+          this.hideEnemyMiniTooltip();
           this.emitState();
         }
       });
@@ -227,12 +324,21 @@ export class BoardScene extends Phaser.Scene {
     for (let y = 0; y < GRID_ROWS; y++) {
       for (let x = 0; x < GRID_COLS; x++) {
         const tileType = this.state.tiles[y][x];
-        const tile = new Tile(this, { x, y }, tileType);
+        const tile = new Tile(this, { x, y }, tileType, this.biome);
         this.tileMap.set(posKey({ x, y }), tile);
 
         if (tileType !== TileType.Obstacle) {
-          tile.on("pointerover", () => tile.setHover(true));
-          tile.on("pointerout", () => tile.setHover(false));
+          tile.on("pointerover", () => {
+            const useBlueHover = !(
+              this.state.actionMode === ActionMode.Move && this.fight.canPlayerMove()
+            );
+            if (useBlueHover) tile.setHover(true);
+            this.updateMovePathPreview({ x, y });
+          });
+          tile.on("pointerout", () => {
+            tile.setHover(false);
+            this.clearMovePathPreview();
+          });
           tile.on("pointerdown", () => this.handleTileClick({ x, y }));
         }
       }
@@ -256,7 +362,37 @@ export class BoardScene extends Phaser.Scene {
     }
   }
 
+  /** Preview the BFS shortest path to `dest` while hovering a reachable tile */
+  private updateMovePathPreview(dest: GridPos): void {
+    this.clearMovePathPreview();
+    if (this.state.actionMode !== ActionMode.Move) return;
+    if (!this.fight.canPlayerMove()) return;
+    if (this.character.isMoving) return;
+
+    const destKey = posKey(dest);
+    if (!this.reachableKeys.has(destKey)) return;
+
+    const blocked = getBlockedSet(this.state);
+    const path = findPath(this.state.character.pos, dest, blocked);
+    if (!path || path.length === 0) return;
+    if (path.length > this.state.remainingPM) return;
+
+    for (const step of path) {
+      const k = posKey(step);
+      this.pathPreviewKeys.add(k);
+      this.tileMap.get(k)?.setPathPreview(true);
+    }
+  }
+
+  private clearMovePathPreview(): void {
+    for (const key of this.pathPreviewKeys) {
+      this.tileMap.get(key)?.setPathPreview(false);
+    }
+    this.pathPreviewKeys.clear();
+  }
+
   private clearReachable(): void {
+    this.clearMovePathPreview();
     for (const key of this.reachableKeys) {
       this.tileMap.get(key)?.setReachable(false);
     }
@@ -296,6 +432,112 @@ export class BoardScene extends Phaser.Scene {
     this.spellRangeKeys.clear();
   }
 
+  /** Show the potential movement zone of an enemy on hover */
+  private showEnemyThreatZone(enemyId: string): void {
+    this.clearEnemyThreatZone();
+    const enemy = this.state.enemies.find((e) => e.id === enemyId);
+    if (!enemy) return;
+
+    // Build blocked set: obstacles + other enemies + player position
+    // but exclude the hovered enemy itself (they move from their spot)
+    const blocked = getBlockedSet(this.state);
+    blocked.delete(posKey(enemy.pos));
+    blocked.add(posKey(this.state.character.pos));
+
+    const reachable = getReachableTiles(enemy.pos, enemy.moveRange, blocked);
+
+    for (const key of reachable.keys()) {
+      this.enemyThreatKeys.add(key);
+      this.tileMap.get(key)?.setEnemyThreat(true);
+    }
+  }
+
+  /** Clear enemy threat zone highlight */
+  private clearEnemyThreatZone(): void {
+    for (const key of this.enemyThreatKeys) {
+      this.tileMap.get(key)?.setEnemyThreat(false);
+    }
+    this.enemyThreatKeys.clear();
+  }
+
+  /** Show a mini tooltip (name + HP) above the hovered enemy */
+  private showEnemyMiniTooltip(enemyId: string): void {
+    this.hideEnemyMiniTooltip();
+
+    const enemy = this.state.enemies.find((e) => e.id === enemyId);
+    if (!enemy) return;
+    const sprite = this.enemySprites.get(enemyId);
+    if (!sprite) return;
+
+    const textStyle = {
+      fontFamily: "monospace",
+      fontSize: `${11 * DPR}px`,
+      fontStyle: "bold" as const,
+      color: "#f0f0f0",
+    };
+    const padBlock = { top: 3 * DPR, bottom: 3 * DPR } as const;
+
+    const nameText = this.add.text(0, 0, `${enemy.name} | `, {
+      ...textStyle,
+      padding: { ...padBlock, left: 8 * DPR, right: 0 },
+    });
+    const hpText = this.add.text(0, 0, `${enemy.hp}/${enemy.maxHp}`, {
+      ...textStyle,
+      padding: { ...padBlock, left: 0, right: 8 * DPR },
+    });
+
+    const heart = this.add.text(0, 0, "❤", {
+      fontFamily: "monospace",
+      fontSize: `${12 * DPR}px`,
+      color: "#ef4444",
+    });
+
+    const gapAfterName = 3 * DPR;
+    const gapBeforeHp = 2 * DPR;
+    const padX = 2 * DPR;
+    const totalW =
+      padX +
+      nameText.width +
+      gapAfterName +
+      heart.width +
+      gapBeforeHp +
+      hpText.width +
+      padX;
+    const totalH = Math.max(nameText.height, heart.height, hpText.height);
+    const centerY = -totalH / 2;
+
+    nameText.setOrigin(0.5, 0.5);
+    heart.setOrigin(0.5, 0.5);
+    hpText.setOrigin(0.5, 0.5);
+
+    // Background
+    const bg = this.add.graphics();
+    bg.fillStyle(0x0c0c14, 0.9);
+    bg.fillRoundedRect(-totalW / 2 - 2, -totalH - 2, totalW + 4, totalH + 4, 4 * DPR);
+    bg.lineStyle(1, 0x2a3050, 1);
+    bg.strokeRoundedRect(-totalW / 2 - 2, -totalH - 2, totalW + 4, totalH + 4, 4 * DPR);
+
+    const left = -totalW / 2 + padX;
+    const heartLeft = left + nameText.width + gapAfterName;
+    const hpLeft = heartLeft + heart.width + gapBeforeHp;
+    nameText.setPosition(left + nameText.width / 2, centerY);
+    heart.setPosition(heartLeft + heart.width / 2, centerY);
+    hpText.setPosition(hpLeft + hpText.width / 2, centerY);
+
+    const container = this.add.container(sprite.x, sprite.y - 38 * DPR, [bg, nameText, heart, hpText]);
+    container.setDepth(50);
+
+    this.enemyHoverTooltip = container;
+  }
+
+  /** Remove the mini tooltip */
+  private hideEnemyMiniTooltip(): void {
+    if (this.enemyHoverTooltip) {
+      this.enemyHoverTooltip.destroy();
+      this.enemyHoverTooltip = null;
+    }
+  }
+
   private async handleTileClick(pos: GridPos): Promise<void> {
     if (this.state.fightResult !== "ongoing") return;
     if (!this.fight.isPlayerTurn()) return;
@@ -305,7 +547,11 @@ export class BoardScene extends Phaser.Scene {
 
     // ── Targeting mode: cast spell ──
     if (this.state.actionMode === ActionMode.Targeting) {
-      if (!this.spellRangeKeys.has(key)) return;
+      if (!this.spellRangeKeys.has(key)) {
+        this.switchToMoveMode();
+        this.emitState();
+        return;
+      }
 
       const spell = this.state.character.spells[this.state.activeSpellIndex!];
       if (!spell) return;
@@ -407,6 +653,10 @@ export class BoardScene extends Phaser.Scene {
 
       const spell = decideEnemyAttack(enemy, this.state.character.pos);
       if (spell) {
+        // Face toward the player and play attack animation
+        sprite.faceToward(this.state.character.pos);
+        await sprite.playAttackAnimation(this);
+
         const { damage } = computeDamage(
           enemy,
           this.state.character,
@@ -472,6 +722,7 @@ export class BoardScene extends Phaser.Scene {
 
     if (this.hoveredEnemyId === id) {
       this.hoveredEnemyId = null;
+      this.hideEnemyMiniTooltip();
     }
   }
 
@@ -488,6 +739,7 @@ export class BoardScene extends Phaser.Scene {
 
     if (this.hoveredEnemyId === id) {
       this.hoveredEnemyId = null;
+      this.hideEnemyMiniTooltip();
     }
   }
 
@@ -528,6 +780,6 @@ export class BoardScene extends Phaser.Scene {
       })),
       combatLog: [...this.state.combatLog],
       hoveredEnemyId: this.hoveredEnemyId,
-    } as GameState & { hoveredEnemyId: string | null });
+    });
   }
 }

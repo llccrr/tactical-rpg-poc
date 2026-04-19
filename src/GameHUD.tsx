@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { GameState } from "./game/core/gameState";
 import { ActionMode } from "./game/core/gameState";
 
@@ -92,7 +93,7 @@ function HPBar({ value, max }: { value: number; max: number }) {
   );
 }
 
-/* ── Point counter ───────────────────────────────── */
+/* ── Point counter (PA / PF / PP / PS) ───────────── */
 
 function PointCounter({
   icon,
@@ -150,6 +151,217 @@ function PointCounter({
   );
 }
 
+/* ── Element badges ──────────────────────────────── */
+
+const ELEMENT_META: Record<string, { label: string; color: string; icon: string }> = {
+  air: { label: "Air", color: "#7dd3fc", icon: "💨" },
+  wind: { label: "Vent", color: "#a3e635", icon: "💨" },
+  water: { label: "Eau", color: "#60a5fa", icon: "💧" },
+  earth: { label: "Terre", color: "#a16207", icon: "🪨" },
+  fire: { label: "Feu", color: "#fb923c", icon: "🔥" },
+  neutral: { label: "Neutre", color: "#a1a1aa", icon: "⚔️" },
+};
+
+function ElementBadge({ element }: { element: string }) {
+  const meta = ELEMENT_META[element];
+  if (!meta) return null;
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        padding: "1px 6px",
+        borderRadius: 3,
+        background: `${meta.color}18`,
+        border: `1px solid ${meta.color}44`,
+        fontSize: 10,
+        fontWeight: 700,
+        color: meta.color,
+        fontFamily: "monospace",
+      }}
+    >
+      <span style={{ fontSize: 11 }}>{meta.icon}</span>
+      {meta.label}
+    </span>
+  );
+}
+
+/* ── Spell tooltip ──────────────────────────────────── */
+
+function SpellTooltip({
+  spell,
+}: {
+  spell: {
+    name: string;
+    range: number;
+    cost: number;
+    baseDamage: number;
+    rangeMin?: number;
+    element?: string;
+    description?: string;
+  };
+}) {
+  const costColor = "#60a5fa";
+  const rangeMin = spell.rangeMin ?? 1;
+  const rangeText = rangeMin === spell.range ? `${spell.range}` : `${rangeMin}-${spell.range}`;
+
+  const descLines = (spell.description ?? "").split("\n").filter(Boolean);
+  const headerLine = descLines[0] ?? "";
+  const hasHeaderLine = headerLine.includes("—") && headerLine.includes("|");
+  const bodyLines = hasHeaderLine ? descLines.slice(1) : descLines;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: "calc(100% + 12px)",
+        left: "50%",
+        transform: "translateX(-50%)",
+        zIndex: 100,
+        pointerEvents: "none",
+        display: "flex",
+        gap: 0,
+        filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.8))",
+      }}
+    >
+      <div
+        style={{
+          minWidth: 220,
+          maxWidth: 280,
+          background: "linear-gradient(180deg, #1a1e2e 0%, #12141f 100%)",
+          border: "2px solid #2a3050",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "8px 12px 6px",
+            background: "linear-gradient(180deg, #222840 0%, #1a1e2e 100%)",
+            borderBottom: "1px solid #2a3050",
+          }}
+        >
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: "#f0f0f0",
+              fontFamily: "monospace",
+              textTransform: "uppercase",
+              letterSpacing: 1,
+              marginBottom: 6,
+            }}
+          >
+            {spell.name}
+          </div>
+
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+            {spell.element && <ElementBadge element={spell.element} />}
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+                padding: "1px 6px",
+                borderRadius: 3,
+                background: `${costColor}18`,
+                border: `1px solid ${costColor}44`,
+                fontSize: 10,
+                fontWeight: 700,
+                color: costColor,
+                fontFamily: "monospace",
+              }}
+            >
+              {spell.cost} PA
+            </span>
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 3,
+                padding: "1px 6px",
+                borderRadius: 3,
+                background: "#ffffff0a",
+                border: "1px solid #ffffff18",
+                fontSize: 10,
+                fontWeight: 700,
+                color: "#aaa",
+                fontFamily: "monospace",
+              }}
+            >
+              {rangeText} PO
+            </span>
+            {spell.baseDamage > 0 && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 3,
+                  padding: "1px 6px",
+                  borderRadius: 3,
+                  background: "#ef444418",
+                  border: "1px solid #ef444444",
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: "#f87171",
+                  fontFamily: "monospace",
+                }}
+              >
+                {spell.baseDamage} DMG
+              </span>
+            )}
+          </div>
+        </div>
+
+        {bodyLines.length > 0 && (
+          <div style={{ padding: "8px 12px 10px" }}>
+            {bodyLines.map((line, i) => (
+              <div
+                key={i}
+                style={{
+                  fontSize: 11,
+                  color: "#c8c8d4",
+                  fontFamily: "monospace",
+                  lineHeight: 1.5,
+                  marginBottom: i < bodyLines.length - 1 ? 2 : 0,
+                }}
+              >
+                {line}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div
+        style={{
+          position: "absolute",
+          bottom: -6,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: 12,
+          height: 6,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            width: 10,
+            height: 10,
+            background: "#12141f",
+            border: "2px solid #2a3050",
+            transform: "rotate(45deg)",
+            position: "absolute",
+            top: -6,
+            left: 1,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
 /* ── Spell slot ──────────────────────────────────── */
 
 function SpellSlot({
@@ -159,84 +371,93 @@ function SpellSlot({
   disabled,
   onSelect,
 }: {
-  spell: { name: string; range: number; cost: number; element?: string; description?: string };
+  spell: { name: string; range: number; cost: number; baseDamage: number; rangeMin?: number; element?: string; description?: string };
   isActive: boolean;
   canAfford: boolean;
   disabled: boolean;
   onSelect: () => void;
 }) {
+  const [hovered, setHovered] = useState(false);
+
   const elementColor: Record<string, string> = {
-    fire: "#fb923c",
-    water: "#60a5fa",
+    air: "#7dd3fc",
     wind: "#a3e635",
+    water: "#60a5fa",
     earth: "#a16207",
+    fire: "#fb923c",
     neutral: "#a1a1aa",
   };
   const accent = spell.element ? elementColor[spell.element] ?? "#2a2a3e" : "#2a2a3e";
 
   return (
-    <button
-      onClick={onSelect}
-      disabled={disabled}
-      title={spell.description ?? `${spell.name} — ${spell.cost} PA — ${spell.range} PO`}
-      style={{
-        width: 48,
-        height: 48,
-        position: "relative",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 1,
-        background: isActive
-          ? "#1a2a4a"
-          : disabled
-            ? "#15151f"
-            : "#1e1e2e",
-        border: isActive
-          ? `2px solid ${accent}`
-          : `2px solid ${accent}44`,
-        borderRadius: 6,
-        cursor: disabled ? "default" : "pointer",
-        outline: "none",
-        padding: 0,
-        boxShadow: isActive
-          ? `0 0 8px ${accent}44, inset 0 0 12px ${accent}22`
-          : "inset 0 2px 4px rgba(0,0,0,0.4)",
-        transition: "border-color 0.15s, box-shadow 0.15s",
-        color: disabled ? "#444" : "#ddd",
-        fontFamily: "monospace",
-      }}
+    <div
+      style={{ position: "relative" }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      <span style={{ fontSize: 18, fontWeight: 800, lineHeight: 1 }}>
-        {spell.name.charAt(0)}
-      </span>
-      <span style={{ fontSize: 8, opacity: 0.5, lineHeight: 1 }}>
-        {spell.range}PO
-      </span>
-
-      <div
+      {hovered && <SpellTooltip spell={spell} />}
+      <button
+        onClick={onSelect}
+        disabled={disabled}
         style={{
-          position: "absolute",
-          top: -6,
-          right: -6,
-          minWidth: 16,
-          height: 16,
-          borderRadius: 3,
-          background: canAfford ? "#2563eb" : "#333",
-          color: canAfford ? "#fff" : "#666",
-          fontSize: 10,
-          fontWeight: 800,
+          width: 48,
+          height: 48,
+          position: "relative",
           display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          padding: "0 3px",
-          border: "2px solid #0c0c14",
+          gap: 1,
+          background: isActive
+            ? "#1a2a4a"
+            : disabled
+              ? "#15151f"
+              : "#1e1e2e",
+          border: isActive
+            ? `2px solid ${accent}`
+            : `2px solid ${accent}44`,
+          borderRadius: 6,
+          cursor: disabled ? "default" : "pointer",
+          outline: "none",
+          padding: 0,
+          boxShadow: isActive
+            ? `0 0 8px ${accent}44, inset 0 0 12px ${accent}22`
+            : "inset 0 2px 4px rgba(0,0,0,0.4)",
+          transition: "border-color 0.15s, box-shadow 0.15s",
+          color: disabled ? "#444" : "#ddd",
+          fontFamily: "monospace",
         }}
       >
-        {spell.cost}
-      </div>
-    </button>
+        <span style={{ fontSize: 18, fontWeight: 800, lineHeight: 1 }}>
+          {spell.name.charAt(0)}
+        </span>
+        <span style={{ fontSize: 8, opacity: 0.5, lineHeight: 1 }}>
+          {spell.range}PO
+        </span>
+
+        <div
+          style={{
+            position: "absolute",
+            top: -6,
+            right: -6,
+            minWidth: 16,
+            height: 16,
+            borderRadius: 3,
+            background: canAfford ? "#2563eb" : "#333",
+            color: canAfford ? "#fff" : "#666",
+            fontSize: 10,
+            fontWeight: 800,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "0 3px",
+            border: "2px solid #0c0c14",
+          }}
+        >
+          {spell.cost}
+        </div>
+      </button>
+    </div>
   );
 }
 
@@ -260,7 +481,6 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
         pointerEvents: "none",
       }}
     >
-      {/* Main panel */}
       <div
         style={{
           display: "flex",
@@ -419,6 +639,185 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
           </span>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── Enemy hover tooltip ─────────────────────────── */
+
+const BEHAVIOR_LABEL: Record<string, { label: string; color: string }> = {
+  melee: { label: "M\u00eal\u00e9e", color: "#f87171" },
+  ranged: { label: "Distance", color: "#38bdf8" },
+  tank: { label: "Tank", color: "#a3e635" },
+  boss: { label: "Boss", color: "#f59e0b" },
+};
+
+export function EnemyTooltip({ state }: { state: GameState | null }) {
+  if (!state || !state.hoveredEnemyId) return null;
+
+  const enemy = state.enemies.find((e) => e.id === state.hoveredEnemyId);
+  if (!enemy) return null;
+
+  const hpPct = Math.max(0, Math.min(100, (enemy.hp / enemy.maxHp) * 100));
+  const hpBarColor = hpPct > 50 ? "#44cc44" : hpPct > 25 ? "#cccc44" : "#cc3333";
+  const behavior = BEHAVIOR_LABEL[enemy.behavior];
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 12,
+        right: 12,
+        zIndex: 30,
+        pointerEvents: "none",
+        filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.7))",
+      }}
+    >
+      <div
+        style={{
+          minWidth: 200,
+          background: "linear-gradient(180deg, #1a1e2e 0%, #12141f 100%)",
+          border: "2px solid #2a3050",
+          borderRadius: 8,
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            padding: "8px 12px 6px",
+            background: "linear-gradient(180deg, #222840 0%, #1a1e2e 100%)",
+            borderBottom: "1px solid #2a3050",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+          }}
+        >
+          <span
+            style={{
+              fontSize: 13,
+              fontWeight: 800,
+              color: "#f0f0f0",
+              fontFamily: "monospace",
+              textTransform: "uppercase",
+              letterSpacing: 1,
+            }}
+          >
+            {enemy.name}
+          </span>
+          {behavior && (
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                color: behavior.color,
+                fontFamily: "monospace",
+                padding: "1px 6px",
+                background: `${behavior.color}18`,
+                border: `1px solid ${behavior.color}44`,
+                borderRadius: 3,
+                textTransform: "uppercase",
+                letterSpacing: 0.3,
+              }}
+            >
+              {behavior.label}
+            </span>
+          )}
+        </div>
+
+        <div style={{ padding: "8px 12px 10px", display: "flex", flexDirection: "column", gap: 6 }}>
+          <div>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+                marginBottom: 3,
+              }}
+            >
+              <span style={{ fontSize: 10, color: "#888", fontFamily: "monospace", fontWeight: 700 }}>
+                PV
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: "#e8e8e8", fontFamily: "monospace" }}>
+                {enemy.hp}
+                <span style={{ color: "#555" }}> / {enemy.maxHp}</span>
+              </span>
+            </div>
+            <div
+              style={{
+                height: 6,
+                background: "#1a1a2e",
+                borderRadius: 3,
+                border: "1px solid #2a2a3e",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  width: `${hpPct}%`,
+                  height: "100%",
+                  background: hpBarColor,
+                  borderRadius: 3,
+                  transition: "width 0.3s ease",
+                  boxShadow: `0 0 6px ${hpBarColor}44`,
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            <StatPill label="ATQ" value={enemy.attack} color="#fb923c" />
+            <StatPill label="DEF" value={enemy.defense} color="#60a5fa" />
+            <StatPill label="PP" value={enemy.moveRange} color="#facc15" />
+            <StatPill label="PA" value={enemy.ap} color="#a78bfa" />
+          </div>
+
+          {enemy.spells.length > 0 && (
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 2 }}>
+              {enemy.spells.map((s, i) => (
+                <span
+                  key={i}
+                  style={{
+                    fontSize: 9,
+                    fontWeight: 700,
+                    color: "#aaa",
+                    fontFamily: "monospace",
+                    padding: "1px 5px",
+                    background: "#ffffff08",
+                    borderRadius: 3,
+                    border: "1px solid #ffffff15",
+                  }}
+                >
+                  {s.name} ({s.baseDamage}dmg, {s.range}po)
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatPill({ label, value, color }: { label: string; value: number; color: string }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "2px 6px",
+        background: `${color}12`,
+        borderRadius: 3,
+        border: `1px solid ${color}33`,
+      }}
+    >
+      <span style={{ fontSize: 9, fontWeight: 700, color: `${color}99`, fontFamily: "monospace" }}>
+        {label}
+      </span>
+      <span style={{ fontSize: 11, fontWeight: 800, color, fontFamily: "monospace" }}>
+        {value}
+      </span>
     </div>
   );
 }

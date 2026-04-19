@@ -20,7 +20,6 @@ import { Tile } from "../entities/Tile";
 import { Character, ENEMY_COLORS } from "../entities/Character";
 import { showDamagePopup } from "../entities/DamagePopup";
 import { gridToScreen } from "../core/iso";
-import { IopLikeCombatEngine, getSpellDef } from "../core/ioplike";
 
 /** Callback shape for pushing state updates to React */
 export type OnStateChange = (state: GameState) => void;
@@ -37,12 +36,9 @@ export class BoardScene extends Phaser.Scene {
 
   private fight!: FightController;
   private eventBus!: CombatEventBus;
-  private classId = "ioplike";
+  private classId = "bretteur";
   private roomConfig?: RoomConfig;
   private equipmentBonuses?: StatBonuses;
-
-  /** IopLike combat engine — only created when classId is "ioplike" */
-  private iopEngine: IopLikeCombatEngine | null = null;
 
   constructor() {
     super({ key: "BoardScene" });
@@ -162,29 +158,10 @@ export class BoardScene extends Phaser.Scene {
     this.state = createInitialState(this.classId, this.roomConfig, this.equipmentBonuses);
     this.eventBus = new CombatEventBus();
     this.fight = new FightController(this.state, this.eventBus);
-
-    // Initialize IopLike engine if playing that class
-    if (this.classId === "ioplike") {
-      this.iopEngine = new IopLikeCombatEngine();
-      this.state.ioplikeState = this.iopEngine.getState();
-    } else {
-      this.iopEngine = null;
-    }
   }
 
-  /** Check if the player can afford a spell (handles PA, PM, blood points) */
-  private canAffordSpell(spell: { cost: number; bloodPointCost?: number; mpCost?: number; spellDefId?: string }): boolean {
+  private canAffordSpell(spell: { cost: number }): boolean {
     if (!this.fight.isPlayerTurn()) return false;
-
-    if (this.iopEngine && spell.spellDefId) {
-      return this.iopEngine.canAffordSpell(
-        spell.spellDefId,
-        this.state.remainingPA,
-        this.state.remainingPM,
-      );
-    }
-
-    // Default: check PA
     return this.state.remainingPA >= spell.cost;
   }
 
@@ -291,17 +268,13 @@ export class BoardScene extends Phaser.Scene {
     const spell = this.state.character.spells[this.state.activeSpellIndex!];
     if (!spell) return;
 
-    const isMobility = spell.tags?.includes("mobility") || spell.tags?.includes("movementSkill");
     const rangeMin = spell.rangeMin ?? 0;
 
     // Spell range ignores enemies — only obstacles block line of fire
-    const obstaclesOnly = getBlockedSet(this.state);
+    const blocked = getBlockedSet(this.state);
     for (const enemy of this.state.enemies) {
-      obstaclesOnly.delete(posKey(enemy.pos));
+      blocked.delete(posKey(enemy.pos));
     }
-    // For mobility spells, also unblock the player's own position isn't an issue
-    // but we need to block enemy positions for movement
-    const blocked = isMobility ? getBlockedSet(this.state) : obstaclesOnly;
 
     const inRange = getReachableTiles(
       this.state.character.pos,
@@ -310,7 +283,6 @@ export class BoardScene extends Phaser.Scene {
     );
 
     for (const [key, dist] of inRange.entries()) {
-      // Filter by minimum range
       if (rangeMin > 0 && dist < rangeMin) continue;
       this.spellRangeKeys.add(key);
       this.tileMap.get(key)?.setSpellRange(true);
@@ -339,23 +311,6 @@ export class BoardScene extends Phaser.Scene {
       if (!spell) return;
       if (!this.canAffordSpell(spell)) return;
 
-      const isMobility = spell.tags?.includes("mobility") || spell.tags?.includes("movementSkill");
-
-      // ── IopLike mobility spell (Jump) ──
-      if (this.iopEngine && spell.spellDefId && isMobility) {
-        await this.handleIopLikeMobility(spell, pos);
-        return;
-      }
-
-      // ── IopLike combat spell ──
-      if (this.iopEngine && spell.spellDefId) {
-        const enemy = this.state.enemies.find((e) => posKey(e.pos) === key);
-        if (!enemy) return;
-        await this.handleIopLikeCast(spell, enemy);
-        return;
-      }
-
-      // ── Default (non-IopLike) spell cast ──
       const enemy = this.state.enemies.find((e) => posKey(e.pos) === key);
       if (!enemy) return;
       if (!this.fight.canPlayerAfford(spell.cost)) return;
@@ -369,6 +324,11 @@ export class BoardScene extends Phaser.Scene {
         enemy.hp,
       );
       enemy.hp -= damage;
+
+      // PS : +1 si on inflige des d\u00e9g\u00e2ts directs (1x / attaque)
+      if (damage > 0) {
+        this.fight.addPS(1, "inflict");
+      }
 
       this.eventBus.emit({
         type: "damage",
@@ -419,208 +379,6 @@ export class BoardScene extends Phaser.Scene {
     this.emitState();
   }
 
-  // ── IopLike spell handlers ────────────────────────────────
-
-  /** Handle IopLike mobility spell (Jump) */
-  private async handleIopLikeMobility(
-    spell: { cost: number; name: string; spellDefId?: string },
-    targetPos: GridPos,
-  ): Promise<void> {
-    if (!this.iopEngine || !spell.spellDefId) return;
-
-    // Spend AP
-    if (spell.cost > 0) this.fight.spendPA(spell.cost);
-
-    // Run through engine for cost recording / combo detection
-    const result = this.iopEngine.castSpell(
-      spell.spellDefId,
-      this.state.character.attack,
-      0, // no defender
-      0,
-      "",
-      this.fight.getRemainingPA(),
-    );
-
-    // Teleport player
-    this.state.character.pos = { ...targetPos };
-    const screen = gridToScreen(targetPos);
-    this.character.setPosition(screen.x, screen.y);
-    this.character.gridPos = targetPos;
-
-    this.eventBus.emit({ type: "info", message: `${spell.name} → téléportation` });
-
-    // Apply combo rewards
-    this.applyIopLikeRewards(result);
-
-    this.state.actionMode = ActionMode.Move;
-    this.state.activeSpellIndex = null;
-    this.syncIopLikeState();
-    this.refreshHighlights();
-    this.emitState();
-  }
-
-  /** Handle IopLike combat spell cast on an enemy */
-  private async handleIopLikeCast(
-    spell: { cost: number; name: string; bloodPointCost?: number; mpCost?: number; spellDefId?: string },
-    enemy: { id: string; pos: GridPos; hp: number; maxHp: number; attack: number; defense: number },
-  ): Promise<void> {
-    if (!this.iopEngine || !spell.spellDefId) return;
-
-    // Spend PA / PM (blood points are spent by the engine)
-    if (spell.cost > 0) this.fight.spendPA(spell.cost);
-    if (spell.mpCost && spell.mpCost > 0) this.fight.spendPM(spell.mpCost);
-
-    // Run through engine
-    const result = this.iopEngine.castSpell(
-      spell.spellDefId,
-      this.state.character.attack,
-      enemy.defense,
-      enemy.hp,
-      enemy.id,
-      this.fight.getRemainingPA(),
-    );
-
-    if (!result.success) return;
-
-    // Apply damage
-    if (result.damage > 0) {
-      enemy.hp -= result.damage;
-
-      this.eventBus.emit({
-        type: "damage",
-        attackerId: "player",
-        targetId: enemy.id,
-        damage: result.damage,
-        spell: spell.name,
-      });
-
-      const enemySprite = this.enemySprites.get(enemy.id);
-      if (enemySprite) {
-        const screen = gridToScreen(enemy.pos);
-        showDamagePopup(this, screen.x, screen.y, result.damage);
-        enemySprite.playHitReaction(this);
-      }
-    }
-
-    // Log effects
-    for (const effect of result.effects) {
-      this.eventBus.emit({ type: "info", message: effect });
-    }
-
-    // Concentration event
-    if (result.concentrationGained > 0) {
-      const iopState = this.iopEngine.getState();
-      this.eventBus.emit({
-        type: "concentration",
-        entityId: "player",
-        amount: result.concentrationGained,
-        total: iopState.concentration,
-      });
-    }
-
-    // Combo event
-    if (result.comboTriggered) {
-      this.eventBus.emit({
-        type: "combo",
-        comboName: result.comboTriggered,
-        reward: `+${result.comboReward?.ap ?? 0} PA, +${result.comboReward?.concentration ?? 0} Concentration`,
-      });
-    }
-
-    // Handle pull (Rafale)
-    if (result.pullDistance > 0 && !result.killed) {
-      this.applyPull(enemy, result.pullDistance);
-    }
-
-    // Handle kill
-    if (result.killed) {
-      this.eventBus.emit({ type: "death", entityId: enemy.id });
-      this.killEnemy(enemy.id);
-    }
-
-    // Apply rewards (PA from finisher kill or combo)
-    this.applyIopLikeRewards(result);
-
-    this.state.actionMode = ActionMode.Move;
-    this.state.activeSpellIndex = null;
-    this.syncIopLikeState();
-    this.refreshHighlights();
-    this.checkFightEnd();
-    this.emitState();
-  }
-
-  /** Apply PA/concentration rewards from engine results */
-  private applyIopLikeRewards(result: {
-    killed: boolean;
-    comboReward: { ap: number; concentration: number } | null;
-    effects: string[];
-    spellId: string;
-  }): void {
-    // Finisher AP reward (Super Iop Punch kill)
-    if (result.killed) {
-      const def = getSpellDef(result.spellId);
-      if (def?.effect.isFinisher && def.effect.finisherApReward) {
-        this.fight.addPA(def.effect.finisherApReward);
-      }
-    }
-
-    // Combo PA reward
-    if (result.comboReward && result.comboReward.ap > 0) {
-      this.fight.addPA(result.comboReward.ap);
-    }
-  }
-
-  /** Pull an enemy closer to the player */
-  private applyPull(
-    enemy: { id: string; pos: GridPos },
-    distance: number,
-  ): void {
-    const playerPos = this.state.character.pos;
-    const dx = playerPos.x - enemy.pos.x;
-    const dy = playerPos.y - enemy.pos.y;
-
-    // Determine pull direction (towards player along the dominant axis)
-    let newPos = { ...enemy.pos };
-    for (let i = 0; i < distance; i++) {
-      const absDx = Math.abs(playerPos.x - newPos.x);
-      const absDy = Math.abs(playerPos.y - newPos.y);
-      let candidate: GridPos;
-
-      if (absDx >= absDy && dx !== 0) {
-        candidate = { x: newPos.x + Math.sign(dx), y: newPos.y };
-      } else if (dy !== 0) {
-        candidate = { x: newPos.x, y: newPos.y + Math.sign(dy) };
-      } else {
-        break;
-      }
-
-      // Don't pull onto player or obstacles
-      const candidateKey = posKey(candidate);
-      if (candidateKey === posKey(playerPos)) break;
-      if (this.state.tiles[candidate.y]?.[candidate.x] === TileType.Obstacle) break;
-      if (this.state.enemies.some((e) => e.id !== enemy.id && posKey(e.pos) === candidateKey)) break;
-
-      newPos = candidate;
-    }
-
-    if (posKey(newPos) !== posKey(enemy.pos)) {
-      enemy.pos = newPos;
-      const sprite = this.enemySprites.get(enemy.id);
-      if (sprite) {
-        const screen = gridToScreen(newPos);
-        sprite.setPosition(screen.x, screen.y);
-        sprite.gridPos = newPos;
-      }
-    }
-  }
-
-  /** Sync IopLike engine state to GameState */
-  private syncIopLikeState(): void {
-    if (this.iopEngine) {
-      this.state.ioplikeState = this.iopEngine.getState();
-    }
-  }
-
   // ── Enemy phase ──────────────────────────────────────────
 
   /** Run all enemy turns sequentially */
@@ -657,6 +415,11 @@ export class BoardScene extends Phaser.Scene {
         );
         this.state.character.hp -= damage;
 
+        // PS : +1 si le joueur subit des d\u00e9g\u00e2ts directs (1x / attaque)
+        if (damage > 0) {
+          this.fight.addPS(1, "take");
+        }
+
         this.eventBus.emit({
           type: "damage",
           attackerId: id,
@@ -691,12 +454,6 @@ export class BoardScene extends Phaser.Scene {
 
     // Enemy phase done — back to player
     this.fight.endEnemyPhase();
-
-    // IopLike: reset per-turn state (combo, cost history)
-    if (this.iopEngine) {
-      this.iopEngine.onTurnStart();
-      this.syncIopLikeState();
-    }
 
     this.refreshHighlights();
     this.emitState();
@@ -757,9 +514,6 @@ export class BoardScene extends Phaser.Scene {
   private emitState(): void {
     this.syncHpBars();
     this.fight.syncLog();
-    if (this.iopEngine) {
-      this.state.ioplikeState = this.iopEngine.getState();
-    }
     this.onStateChange?.({
       ...this.state,
       character: {
@@ -773,7 +527,6 @@ export class BoardScene extends Phaser.Scene {
         spells: [...e.spells],
       })),
       combatLog: [...this.state.combatLog],
-      ioplikeState: this.state.ioplikeState ? { ...this.state.ioplikeState } : undefined,
       hoveredEnemyId: this.hoveredEnemyId,
     } as GameState & { hoveredEnemyId: string | null });
   }

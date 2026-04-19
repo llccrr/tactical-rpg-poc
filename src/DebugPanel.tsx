@@ -80,102 +80,25 @@ export function DebugPanel({
         <strong>Position:</strong> ({character.pos.x}, {character.pos.y})
       </div>
 
-      {/* PM / PA bars */}
-      <div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-          <strong style={{ color: "#44cc88" }}>PM</strong>
-          <span>
-            {state.remainingPM} / {character.moveRange}
-          </span>
+      {/* Ressources (spec Edouard) */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 4, fontSize: 12 }}>
+        <div>
+          <strong style={{ color: "#4488ee" }}>PA</strong> {state.remainingPA}
+          <span style={{ color: "#666" }}> (+{character.ap}/tour)</span>
         </div>
-        <div
-          style={{
-            height: 8,
-            background: "#222",
-            borderRadius: 4,
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              width: `${(state.remainingPM / character.moveRange) * 100}%`,
-              height: "100%",
-              background: "#44cc88",
-              borderRadius: 4,
-              transition: "width 0.2s",
-            }}
-          />
+        <div>
+          <strong style={{ color: "#c084fc" }}>PF</strong> {state.remainingPF}
+          <span style={{ color: "#666" }}> (+{character.pf}/tour)</span>
+        </div>
+        <div>
+          <strong style={{ color: "#facc15" }}>PP</strong> {state.remainingPM}
+          <span style={{ color: "#666" }}> (+{character.moveRange}/tour)</span>
+        </div>
+        <div>
+          <strong style={{ color: "#ef4444" }}>PS</strong> {state.remainingPS} /{" "}
+          {character.psMax}
         </div>
       </div>
-
-      <div>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-          <strong style={{ color: "#4488ee" }}>PA</strong>
-          <span>
-            {state.remainingPA} / {character.ap}
-          </span>
-        </div>
-        <div
-          style={{
-            height: 8,
-            background: "#222",
-            borderRadius: 4,
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              width: `${(state.remainingPA / character.ap) * 100}%`,
-              height: "100%",
-              background: "#4488ee",
-              borderRadius: 4,
-              transition: "width 0.2s",
-            }}
-          />
-        </div>
-      </div>
-
-      {/* IopLike resources */}
-      {state.ioplikeState && (
-        <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-          <div>
-            <strong style={{ color: "#f59e0b" }}>Concentration</strong>{" "}
-            {state.ioplikeState.concentration} / {state.ioplikeState.concentrationMax}
-          </div>
-          <div
-            style={{
-              height: 8,
-              background: "#222",
-              borderRadius: 4,
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                width: `${(state.ioplikeState.concentration / state.ioplikeState.concentrationMax) * 100}%`,
-                height: "100%",
-                background: "linear-gradient(90deg, #f59e0b, #f97316)",
-                borderRadius: 4,
-                transition: "width 0.2s",
-              }}
-            />
-          </div>
-          <div>
-            <strong style={{ color: "#ef4444" }}>Pts de sang</strong>{" "}
-            {state.ioplikeState.bloodPoints} / {state.ioplikeState.bloodPointsMax}
-          </div>
-          {state.ioplikeState.courroux > 0 && (
-            <div style={{ color: "#f97316" }}>
-              Courroux x{state.ioplikeState.courroux}
-            </div>
-          )}
-          {state.ioplikeState.preparation > 0 && (
-            <div style={{ color: "#a855f7" }}>
-              Préparation active
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Spell bar */}
       <h3 style={{ margin: "8px 0 0", color: "#4488ee" }}>Sorts</h3>
@@ -184,19 +107,9 @@ export function DebugPanel({
           const isActive =
             state.actionMode === ActionMode.Targeting &&
             state.activeSpellIndex === i;
-          const isBlood = (spell.bloodPointCost ?? 0) > 0;
-          const isMp = (spell.mpCost ?? 0) > 0;
-          const canAfford = isBlood
-            ? (state.ioplikeState?.bloodPoints ?? 0) >= spell.bloodPointCost!
-            : isMp
-              ? state.remainingPM >= spell.mpCost!
-              : state.remainingPA >= spell.cost;
+          const canAfford = state.remainingPA >= spell.cost;
           const disabled = !isPlayerTurn || !canAfford;
-          const costLabel = isBlood
-            ? `${spell.bloodPointCost} PS`
-            : isMp
-              ? `${spell.mpCost} PM`
-              : `${spell.cost} PA`;
+          const costLabel = `${spell.cost} PA`;
           return (
             <button
               key={i}

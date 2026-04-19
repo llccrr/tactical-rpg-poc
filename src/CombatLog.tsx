@@ -32,10 +32,6 @@ function formatEvent(event: CombatEvent, state: GameState): string | null {
       return event.result === "victory" ? "--- Victoire ! ---" : "--- Defaite... ---";
     case "info":
       return event.message;
-    case "combo":
-      return `★ ${event.comboName} ! (${event.reward})`;
-    case "concentration":
-      return `Concentration +${event.amount} → ${event.total}`;
     default:
       return null;
   }
@@ -86,17 +82,13 @@ export function CombatLog({ state }: Props) {
             key={i}
             style={{
               marginBottom: 3,
-              color: msg.startsWith("★")
-                ? "#f59e0b"
-                : msg.includes("Concentration")
-                  ? "#f59e0b"
-                  : msg.includes("vaincu")
-                      ? "#ff6644"
-                      : msg.includes("Victoire")
-                        ? "#44cc44"
-                        : msg.includes("Defaite")
-                          ? "#cc3333"
-                          : "#ccc",
+              color: msg.includes("vaincu")
+                ? "#ff6644"
+                : msg.includes("Victoire")
+                  ? "#44cc44"
+                  : msg.includes("Defaite")
+                    ? "#cc3333"
+                    : "#ccc",
             }}
           >
             {msg}

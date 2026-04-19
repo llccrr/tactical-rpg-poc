@@ -1,6 +1,5 @@
 import type { GameState } from "./game/core/gameState";
 import { ActionMode } from "./game/core/gameState";
-import type { IopLikeState } from "./game/core/ioplike";
 
 interface GameHUDProps {
   state: GameState | null;
@@ -20,7 +19,7 @@ function StarIcon() {
 
 function BootIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="#4ade80">
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="#facc15">
       <path d="M2 22l1-4h4l1-2h4l1-4h4l2-2V4l-4 2-1 4h-4l-1 2H5L4 14H2z" />
     </svg>
   );
@@ -34,10 +33,10 @@ function BloodIcon() {
   );
 }
 
-function ConcentrationIcon() {
+function FunctionIcon() {
   return (
-    <svg viewBox="0 0 24 24" width="14" height="14" fill="#f59e0b">
-      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="#c084fc">
+      <path d="M12 2l3 7h7l-5.5 4.5L18 22l-6-4-6 4 1.5-8.5L2 9h7z" />
     </svg>
   );
 }
@@ -93,70 +92,27 @@ function HPBar({ value, max }: { value: number; max: number }) {
   );
 }
 
-/* ── Concentration bar ───────────────────────────── */
-
-function ConcentrationBar({ value, max }: { value: number; max: number }) {
-  const pct = Math.max(0, Math.min(100, (value / max) * 100));
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 120 }}>
-      <ConcentrationIcon />
-      <div style={{ flex: 1 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            fontSize: 9,
-            fontWeight: 700,
-            color: "#f59e0b",
-            marginBottom: 2,
-            fontFamily: "monospace",
-          }}
-        >
-          <span>{value}</span>
-          <span style={{ color: "#666" }}>{max}</span>
-        </div>
-        <div
-          style={{
-            height: 5,
-            background: "#1a1a2e",
-            borderRadius: 3,
-            border: "1px solid #2a2a3e",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              width: `${pct}%`,
-              height: "100%",
-              background: `linear-gradient(90deg, #f59e0b, #f97316)`,
-              borderRadius: 3,
-              transition: "width 0.3s ease",
-              boxShadow: `0 0 6px #f59e0b44`,
-            }}
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Point counter (PA / PM / Blood) ─────────────── */
+/* ── Point counter ───────────────────────────────── */
 
 function PointCounter({
   icon,
   value,
-  max,
+  suffix,
   color,
   bgColor,
+  title,
 }: {
   icon: React.ReactNode;
   value: number;
-  max: number;
+  /** Small subscript text, e.g. "+1" for regen or "/10" for capped resources. */
+  suffix: string;
   color: string;
   bgColor: string;
+  title: string;
 }) {
   return (
     <div
+      title={title}
       style={{
         display: "flex",
         alignItems: "center",
@@ -188,63 +144,8 @@ function PointCounter({
           lineHeight: 1,
         }}
       >
-        /{max}
+        {suffix}
       </span>
-    </div>
-  );
-}
-
-/* ── Status badge (Courroux / Préparation) ───────── */
-
-function StatusBadge({
-  label,
-  stacks,
-  color,
-  glowColor,
-}: {
-  label: string;
-  stacks: number;
-  color: string;
-  glowColor: string;
-}) {
-  if (stacks <= 0) return null;
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 4,
-        padding: "2px 7px",
-        background: `${color}22`,
-        borderRadius: 4,
-        border: `1px solid ${color}66`,
-        boxShadow: `0 0 8px ${glowColor}`,
-      }}
-    >
-      <span
-        style={{
-          fontSize: 9,
-          fontWeight: 800,
-          color,
-          fontFamily: "monospace",
-          textTransform: "uppercase",
-          letterSpacing: 0.5,
-        }}
-      >
-        {label}
-      </span>
-      {stacks > 1 && (
-        <span
-          style={{
-            fontSize: 11,
-            fontWeight: 900,
-            color,
-            fontFamily: "monospace",
-          }}
-        >
-          x{stacks}
-        </span>
-      )}
     </div>
   );
 }
@@ -253,37 +154,22 @@ function StatusBadge({
 
 function SpellSlot({
   spell,
-  index,
   isActive,
   canAfford,
   disabled,
   onSelect,
 }: {
-  spell: { name: string; range: number; cost: number; bloodPointCost?: number; mpCost?: number; element?: string; description?: string };
-  index: number;
+  spell: { name: string; range: number; cost: number; element?: string; description?: string };
   isActive: boolean;
   canAfford: boolean;
   disabled: boolean;
   onSelect: () => void;
 }) {
-  // Determine cost label
-  const isBlood = (spell.bloodPointCost ?? 0) > 0;
-  const isMp = (spell.mpCost ?? 0) > 0;
-  const costValue = isBlood
-    ? spell.bloodPointCost!
-    : isMp
-      ? spell.mpCost!
-      : spell.cost;
-  const costLabel = isBlood ? "PS" : isMp ? "PM" : "PA";
-  const costBadgeColor = isBlood
-    ? (canAfford ? "#dc2626" : "#333")
-    : (canAfford ? "#2563eb" : "#333");
-
-  // Element border accent
   const elementColor: Record<string, string> = {
-    air: "#7dd3fc",
-    earth: "#a3e635",
     fire: "#fb923c",
+    water: "#60a5fa",
+    wind: "#a3e635",
+    earth: "#a16207",
     neutral: "#a1a1aa",
   };
   const accent = spell.element ? elementColor[spell.element] ?? "#2a2a3e" : "#2a2a3e";
@@ -292,7 +178,7 @@ function SpellSlot({
     <button
       onClick={onSelect}
       disabled={disabled}
-      title={spell.description ?? `${spell.name} — ${costValue} ${costLabel} — ${spell.range} PO`}
+      title={spell.description ?? `${spell.name} — ${spell.cost} PA — ${spell.range} PO`}
       style={{
         width: 48,
         height: 48,
@@ -329,7 +215,6 @@ function SpellSlot({
         {spell.range}PO
       </span>
 
-      {/* Cost badge */}
       <div
         style={{
           position: "absolute",
@@ -338,7 +223,7 @@ function SpellSlot({
           minWidth: 16,
           height: 16,
           borderRadius: 3,
-          background: costBadgeColor,
+          background: canAfford ? "#2563eb" : "#333",
           color: canAfford ? "#fff" : "#666",
           fontSize: 10,
           fontWeight: 800,
@@ -349,59 +234,9 @@ function SpellSlot({
           border: "2px solid #0c0c14",
         }}
       >
-        {costValue}
+        {spell.cost}
       </div>
-
-      {/* Blood/MP indicator dot */}
-      {(isBlood || isMp) && (
-        <div
-          style={{
-            position: "absolute",
-            top: -6,
-            left: -4,
-            fontSize: 8,
-            fontWeight: 900,
-            color: isBlood ? "#ef4444" : "#4ade80",
-            fontFamily: "monospace",
-          }}
-        >
-          {costLabel}
-        </div>
-      )}
     </button>
-  );
-}
-
-/* ── IopLike resource panel ──────────────────────── */
-
-function IopLikePanel({ iop, remainingPA }: { iop: IopLikeState; remainingPA: number }) {
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      {/* Concentration bar */}
-      <ConcentrationBar value={iop.concentration} max={iop.concentrationMax} />
-      {/* Blood points + statuses */}
-      <div style={{ display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" }}>
-        <PointCounter
-          icon={<BloodIcon />}
-          value={iop.bloodPoints}
-          max={iop.bloodPointsMax}
-          color="#ef4444"
-          bgColor="#ef444411"
-        />
-        <StatusBadge
-          label="Courroux"
-          stacks={iop.courroux}
-          color="#f97316"
-          glowColor="#f9731633"
-        />
-        <StatusBadge
-          label="Prép."
-          stacks={iop.preparation}
-          color="#a855f7"
-          glowColor="#a855f733"
-        />
-      </div>
-    </div>
   );
 }
 
@@ -412,7 +247,6 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
 
   const { character } = state;
   const isPlayerTurn = state.currentTurn === "player";
-  const iop = state.ioplikeState;
 
   return (
     <div
@@ -445,38 +279,41 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
         {/* ── Stats block ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <HPBar value={character.hp} max={character.maxHp} />
-          <div style={{ display: "flex", gap: 6 }}>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <PointCounter
               icon={<StarIcon />}
               value={state.remainingPA}
-              max={character.ap}
+              suffix={`+${character.ap}`}
               color="#60a5fa"
               bgColor="#60a5fa11"
+              title={`PA (Points d'Action) — gain +${character.ap} / tour`}
+            />
+            <PointCounter
+              icon={<FunctionIcon />}
+              value={state.remainingPF}
+              suffix={`+${character.pf}`}
+              color="#c084fc"
+              bgColor="#c084fc11"
+              title={`PF (Points de Fonction) — gain +${character.pf} / tour`}
             />
             <PointCounter
               icon={<BootIcon />}
               value={state.remainingPM}
-              max={character.moveRange}
-              color="#4ade80"
-              bgColor="#4ade8011"
+              suffix={`+${character.moveRange}`}
+              color="#facc15"
+              bgColor="#facc1511"
+              title={`PP (Points de Placement) — gain +${character.moveRange} / tour`}
+            />
+            <PointCounter
+              icon={<BloodIcon />}
+              value={state.remainingPS}
+              suffix={`/${character.psMax}`}
+              color="#ef4444"
+              bgColor="#ef444411"
+              title={`PS (Points de Sang) — cap ${character.psMax}, +1 par d\u00e9g\u00e2t inflig\u00e9 ou subi`}
             />
           </div>
         </div>
-
-        {/* ── IopLike resources ── */}
-        {iop && (
-          <>
-            <div
-              style={{
-                width: 2,
-                alignSelf: "stretch",
-                background: "linear-gradient(to bottom, transparent, #2a2a3e, transparent)",
-                margin: "0 2px",
-              }}
-            />
-            <IopLikePanel iop={iop} remainingPA={state.remainingPA} />
-          </>
-        )}
 
         {/* ── Divider ── */}
         <div
@@ -494,22 +331,13 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
             const isActive =
               state.actionMode === ActionMode.Targeting &&
               state.activeSpellIndex === i;
-
-            // Affordability check: blood > mp > pa
-            const isBlood = (spell.bloodPointCost ?? 0) > 0;
-            const isMp = (spell.mpCost ?? 0) > 0;
-            const canAfford = isBlood
-              ? (iop?.bloodPoints ?? 0) >= spell.bloodPointCost!
-              : isMp
-                ? state.remainingPM >= spell.mpCost!
-                : state.remainingPA >= spell.cost;
+            const canAfford = state.remainingPA >= spell.cost;
             const disabled = !isPlayerTurn || !canAfford;
 
             return (
               <SpellSlot
                 key={i}
                 spell={spell}
-                index={i}
                 isActive={isActive}
                 canAfford={canAfford}
                 disabled={disabled}

@@ -6,7 +6,6 @@ import { getClassById } from "../data/classes";
 import { makeEnemy } from "../data/enemies";
 import type { RoomDef } from "../data/dungeons";
 import type { StatBonuses } from "../data/items";
-import type { IopLikeState } from "./ioplike";
 
 export enum TileType {
   Empty = "empty",
@@ -21,16 +20,11 @@ export enum ActionMode {
 export interface Spell {
   name: string;
   range: number;
-  cost: number; // PA cost (0 if uses other resource)
+  cost: number; // PA cost
   baseDamage: number;
-  // IopLike extended fields
   rangeMin?: number;
-  bloodPointCost?: number;
-  mpCost?: number;
   element?: string;
-  tags?: string[];
-  spellDefId?: string; // link to SpellDefinition in ioplike system
-  description?: string; // tooltip text for the player
+  description?: string;
 }
 
 export interface CharacterState {
@@ -39,8 +33,14 @@ export interface CharacterState {
   maxHp: number;
   attack: number;
   defense: number;
-  moveRange: number; // max PM per turn
-  ap: number;        // max PA per turn
+  /** PP gained at the start of each player turn (spec : 4) */
+  moveRange: number;
+  /** PA gained at the start of each player turn (spec : 1) */
+  ap: number;
+  /** PF gained at the start of each player turn (spec : 1) */
+  pf: number;
+  /** PS cap (spec : 10) */
+  psMax: number;
   selected: boolean;
   spells: Spell[];
 }
@@ -71,10 +71,10 @@ export interface GameState {
   turnNumber: number;
   remainingPM: number;
   remainingPA: number;
+  remainingPF: number;
+  remainingPS: number;
   fightResult: FightResult;
   combatLog: CombatEvent[];
-  /** IopLike class-specific combat state (only set when playing IopLike) */
-  ioplikeState?: IopLikeState;
 }
 
 /** Config for a single dungeon room — overrides default enemies and optionally player HP */
@@ -131,6 +131,8 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig, bon
       defense: classDef.baseDefense + (bonuses?.defense ?? 0),
       moveRange: classDef.basePm,
       ap: classDef.basePa,
+      pf: classDef.basePf,
+      psMax: classDef.basePsMax,
       selected: true,
       spells: [...classDef.spells],
     },
@@ -139,8 +141,11 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig, bon
     activeSpellIndex: null,
     currentTurn: "player",
     turnNumber: 1,
+    // Turn 1 : on applique directement le gain de d\u00e9but de tour
     remainingPM: classDef.basePm,
     remainingPA: classDef.basePa,
+    remainingPF: classDef.basePf,
+    remainingPS: 0,
     fightResult: "ongoing",
     combatLog: [],
   };

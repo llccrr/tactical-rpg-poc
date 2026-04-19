@@ -34,7 +34,12 @@
       "Bash(dpkg -l)",
       "Bash(ls /home/loic/dev/tactical-rpg-poc/test-*.mjs)",
       "Bash(ls /home/loic/dev/tactical-rpg-poc/src/*.js /home/loic/dev/tactical-rpg-poc/src/**/*.js)",
-      "Bash(ls test-*.mjs)"
+      "Bash(ls test-*.mjs)",
+      "Bash(find /home/loic/dev/tactical-rpg-poc -type f \\\\\\(-name *.mp3 -o -name *.wav -o -name *.ogg \\\\\\))",
+      "Bash(grep -r \"dialogue\\\\|quest\\\\|story\\\\|narrative\\\\|text\\\\|message\" /home/loic/dev/tactical-rpg-poc/src --include=*.ts --include=*.tsx -l)",
+      "mcp__notion__notion-search",
+      "mcp__notion__*",
+      "Bash(grep '\\\\.js$')"
     ]
   }
 }

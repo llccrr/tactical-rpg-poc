@@ -101,7 +101,9 @@ function PointCounter({
   suffix,
   color,
   bgColor,
-  title,
+  tooltipTitle,
+  tooltipBadges,
+  tooltipLines,
 }: {
   icon: React.ReactNode;
   value: number;
@@ -109,44 +111,59 @@ function PointCounter({
   suffix: string;
   color: string;
   bgColor: string;
-  title: string;
+  tooltipTitle: string;
+  tooltipBadges?: React.ReactNode;
+  tooltipLines?: string[];
 }) {
+  const [hovered, setHovered] = useState(false);
   return (
     <div
-      title={title}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 5,
-        padding: "3px 8px 3px 6px",
-        background: bgColor,
-        borderRadius: 4,
-        border: `1px solid ${color}33`,
-      }}
+      style={{ position: "relative" }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
     >
-      {icon}
-      <span
+      {hovered && (
+        <HoverTooltip
+          title={tooltipTitle}
+          badges={tooltipBadges}
+          description={tooltipLines}
+        />
+      )}
+      <div
         style={{
-          fontSize: 14,
-          fontWeight: 800,
-          color,
-          fontFamily: "monospace",
-          lineHeight: 1,
+          display: "flex",
+          alignItems: "center",
+          gap: 5,
+          padding: "3px 8px 3px 6px",
+          background: bgColor,
+          borderRadius: 4,
+          border: `1px solid ${color}33`,
         }}
       >
-        {value}
-      </span>
-      <span
-        style={{
-          fontSize: 10,
-          color: "#555",
-          fontWeight: 600,
-          fontFamily: "monospace",
-          lineHeight: 1,
-        }}
-      >
-        {suffix}
-      </span>
+        {icon}
+        <span
+          style={{
+            fontSize: 14,
+            fontWeight: 800,
+            color,
+            fontFamily: "monospace",
+            lineHeight: 1,
+          }}
+        >
+          {value}
+        </span>
+        <span
+          style={{
+            fontSize: 10,
+            color: "#555",
+            fontWeight: 600,
+            fontFamily: "monospace",
+            lineHeight: 1,
+          }}
+        >
+          {suffix}
+        </span>
+      </div>
     </div>
   );
 }
@@ -186,29 +203,52 @@ function ElementBadge({ element }: { element: string }) {
   );
 }
 
-/* ── Spell tooltip ──────────────────────────────────── */
+/* ── Inline badge used inside tooltips ──────────────── */
 
-function SpellTooltip({
-  spell,
+function TooltipBadge({
+  color,
+  background,
+  borderColor,
+  children,
 }: {
-  spell: {
-    name: string;
-    range: number;
-    cost: number;
-    damagePercent: number;
-    rangeMin?: number;
-    element?: string;
-    description?: string;
-  };
+  color: string;
+  background?: string;
+  borderColor?: string;
+  children: React.ReactNode;
 }) {
-  const costColor = "#60a5fa";
-  const rangeMin = spell.rangeMin ?? 1;
-  const rangeText = rangeMin === spell.range ? `${spell.range}` : `${rangeMin}-${spell.range}`;
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 3,
+        padding: "1px 6px",
+        borderRadius: 3,
+        background: background ?? `${color}18`,
+        border: `1px solid ${borderColor ?? `${color}44`}`,
+        fontSize: 10,
+        fontWeight: 700,
+        color,
+        fontFamily: "monospace",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
 
-  const descLines = (spell.description ?? "").split("\n").filter(Boolean);
-  const headerLine = descLines[0] ?? "";
-  const hasHeaderLine = headerLine.includes("—") && headerLine.includes("|");
-  const bodyLines = hasHeaderLine ? descLines.slice(1) : descLines;
+/* ── Generic hover tooltip (shared by spells & stats) ── */
+
+function HoverTooltip({
+  title,
+  badges,
+  description,
+}: {
+  title: string;
+  badges?: React.ReactNode;
+  description?: string[];
+}) {
+  const lines = description ?? [];
 
   return (
     <div
@@ -249,73 +289,22 @@ function SpellTooltip({
               fontFamily: "monospace",
               textTransform: "uppercase",
               letterSpacing: 1,
-              marginBottom: 6,
+              marginBottom: badges ? 6 : 0,
             }}
           >
-            {spell.name}
+            {title}
           </div>
 
-          <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
-            {spell.element && <ElementBadge element={spell.element} />}
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 3,
-                padding: "1px 6px",
-                borderRadius: 3,
-                background: `${costColor}18`,
-                border: `1px solid ${costColor}44`,
-                fontSize: 10,
-                fontWeight: 700,
-                color: costColor,
-                fontFamily: "monospace",
-              }}
-            >
-              {spell.cost} PA
-            </span>
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 3,
-                padding: "1px 6px",
-                borderRadius: 3,
-                background: "#ffffff0a",
-                border: "1px solid #ffffff18",
-                fontSize: 10,
-                fontWeight: 700,
-                color: "#aaa",
-                fontFamily: "monospace",
-              }}
-            >
-              {rangeText} PO
-            </span>
-            {spell.damagePercent > 0 && (
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 3,
-                  padding: "1px 6px",
-                  borderRadius: 3,
-                  background: "#ef444418",
-                  border: "1px solid #ef444444",
-                  fontSize: 10,
-                  fontWeight: 700,
-                  color: "#f87171",
-                  fontFamily: "monospace",
-                }}
-              >
-                {spell.damagePercent}%
-              </span>
-            )}
-          </div>
+          {badges && (
+            <div style={{ display: "flex", gap: 4, flexWrap: "wrap", alignItems: "center" }}>
+              {badges}
+            </div>
+          )}
         </div>
 
-        {bodyLines.length > 0 && (
+        {lines.length > 0 && (
           <div style={{ padding: "8px 12px 10px" }}>
-            {bodyLines.map((line, i) => (
+            {lines.map((line, i) => (
               <div
                 key={i}
                 style={{
@@ -323,7 +312,7 @@ function SpellTooltip({
                   color: "#c8c8d4",
                   fontFamily: "monospace",
                   lineHeight: 1.5,
-                  marginBottom: i < bodyLines.length - 1 ? 2 : 0,
+                  marginBottom: i < lines.length - 1 ? 2 : 0,
                 }}
               >
                 {line}
@@ -359,6 +348,47 @@ function SpellTooltip({
       </div>
     </div>
   );
+}
+
+/* ── Spell tooltip ──────────────────────────────────── */
+
+function SpellTooltip({
+  spell,
+}: {
+  spell: {
+    name: string;
+    range: number;
+    cost: number;
+    damagePercent: number;
+    rangeMin?: number;
+    element?: string;
+    description?: string;
+  };
+}) {
+  const rangeMin = spell.rangeMin ?? 1;
+  const rangeText = rangeMin === spell.range ? `${spell.range}` : `${rangeMin}-${spell.range}`;
+
+  const descLines = (spell.description ?? "").split("\n").filter(Boolean);
+  const headerLine = descLines[0] ?? "";
+  const hasHeaderLine = headerLine.includes("—") && headerLine.includes("|");
+  const bodyLines = hasHeaderLine ? descLines.slice(1) : descLines;
+
+  const badges = (
+    <>
+      {spell.element && <ElementBadge element={spell.element} />}
+      <TooltipBadge color="#60a5fa">{spell.cost} PA</TooltipBadge>
+      <TooltipBadge color="#aaa" background="#ffffff0a" borderColor="#ffffff18">
+        {rangeText} PO
+      </TooltipBadge>
+      {spell.damagePercent > 0 && (
+        <TooltipBadge color="#f87171" background="#ef444418" borderColor="#ef444444">
+          {spell.damagePercent}%
+        </TooltipBadge>
+      )}
+    </>
+  );
+
+  return <HoverTooltip title={spell.name} badges={badges} description={bodyLines} />;
 }
 
 /* ── Spell slot ──────────────────────────────────── */
@@ -504,7 +534,16 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
               suffix={`+${character.ap}`}
               color="#60a5fa"
               bgColor="#60a5fa11"
-              title={`PA (Points d'Action) — gain +${character.ap} / tour`}
+              tooltipTitle="PA — Points d'Action"
+              tooltipBadges={
+                <>
+                  <TooltipBadge color="#60a5fa">{state.remainingPA} restants</TooltipBadge>
+                  <TooltipBadge color="#aaa" background="#ffffff0a" borderColor="#ffffff18">
+                    +{character.ap} / tour
+                  </TooltipBadge>
+                </>
+              }
+              tooltipLines={["Consommés pour lancer des sorts."]}
             />
             <PointCounter
               icon={<FunctionIcon />}
@@ -512,7 +551,16 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
               suffix={`+${character.pf}`}
               color="#c084fc"
               bgColor="#c084fc11"
-              title={`PF (Points de Fonction) — gain +${character.pf} / tour`}
+              tooltipTitle="PF — Points de Fonction"
+              tooltipBadges={
+                <>
+                  <TooltipBadge color="#c084fc">{state.remainingPF} restants</TooltipBadge>
+                  <TooltipBadge color="#aaa" background="#ffffff0a" borderColor="#ffffff18">
+                    +{character.pf} / tour
+                  </TooltipBadge>
+                </>
+              }
+              tooltipLines={["Utilisés pour les capacités spéciales."]}
             />
             <PointCounter
               icon={<BootIcon />}
@@ -520,7 +568,16 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
               suffix={`+${character.moveRange}`}
               color="#facc15"
               bgColor="#facc1511"
-              title={`PP (Points de Placement) — gain +${character.moveRange} / tour`}
+              tooltipTitle="PP — Points de Placement"
+              tooltipBadges={
+                <>
+                  <TooltipBadge color="#facc15">{state.remainingPM} restants</TooltipBadge>
+                  <TooltipBadge color="#aaa" background="#ffffff0a" borderColor="#ffffff18">
+                    +{character.moveRange} / tour
+                  </TooltipBadge>
+                </>
+              }
+              tooltipLines={["Consommés en se déplaçant sur la grille."]}
             />
             <PointCounter
               icon={<BloodIcon />}
@@ -528,7 +585,18 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
               suffix={`/${character.psMax}`}
               color="#ef4444"
               bgColor="#ef444411"
-              title={`PS (Points de Sang) — cap ${character.psMax}, +1 par d\u00e9g\u00e2t inflig\u00e9 ou subi`}
+              tooltipTitle="PS — Points de Sang"
+              tooltipBadges={
+                <>
+                  <TooltipBadge color="#f87171" background="#ef444418" borderColor="#ef444444">
+                    {state.remainingPS} / {character.psMax}
+                  </TooltipBadge>
+                </>
+              }
+              tooltipLines={[
+                "+1 par dégât infligé ou subi.",
+                `Plafonné à ${character.psMax}.`,
+              ]}
             />
           </div>
         </div>

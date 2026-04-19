@@ -1,7 +1,9 @@
 /** Global constants for the tactical board */
 
 /** Device pixel ratio (capped at 2 for performance) */
-export const DPR = Math.min(window.devicePixelRatio || 1, 2);
+// Floor at 1.5 so the canvas (1024*DPR px) always exceeds typical container widths
+// (~1400-1600px), avoiding CSS upscaling that blurs vector graphics.
+export const DPR = Math.min(Math.max(window.devicePixelRatio || 1, 1.5), 2);
 
 export const GRID_COLS = 10;
 export const GRID_ROWS = 10;

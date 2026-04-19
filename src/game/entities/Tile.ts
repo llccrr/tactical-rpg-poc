@@ -1,5 +1,5 @@
 import Phaser from "phaser";
-import { TILE_WIDTH, TILE_HEIGHT } from "../config";
+import { TILE_WIDTH, TILE_HEIGHT, DPR } from "../config";
 import { gridToScreen } from "../core/iso";
 import type { GridPos } from "../core/grid";
 import { TileType } from "../core/gameState";
@@ -29,12 +29,12 @@ interface HighlightStyle {
 }
 
 const HIGHLIGHT: Record<string, HighlightStyle> = {
-  reachable:   { fill: 0x44cc88, fillAlpha: 0.45, stroke: 0x88ffcc, strokeAlpha: 1,    strokeWidth: 2 },
-  pathPreview: { fill: 0xe8cc44, fillAlpha: 0.55, stroke: 0xffee88, strokeAlpha: 1,    strokeWidth: 2.5 },
-  spellRange:  { fill: 0x4488ee, fillAlpha: 0.45, stroke: 0x88ccff, strokeAlpha: 1,    strokeWidth: 2 },
-  hover:       { fill: 0x88bbff, fillAlpha: 0.5,  stroke: 0xccddff, strokeAlpha: 1,    strokeWidth: 2.5 },
-  enemyThreat: { fill: 0xcc4444, fillAlpha: 0.4,  stroke: 0xff6666, strokeAlpha: 1,    strokeWidth: 2 },
-  none:        { fill: 0x000000, fillAlpha: 0,     stroke: 0xffffff, strokeAlpha: 0.25, strokeWidth: 1 },
+  reachable:   { fill: 0x44cc88, fillAlpha: 0.45, stroke: 0x88ffcc, strokeAlpha: 1,    strokeWidth: 2 * DPR },
+  pathPreview: { fill: 0xe8cc44, fillAlpha: 0.55, stroke: 0xffee88, strokeAlpha: 1,    strokeWidth: 2.5 * DPR },
+  spellRange:  { fill: 0x4488ee, fillAlpha: 0.45, stroke: 0x88ccff, strokeAlpha: 1,    strokeWidth: 2 * DPR },
+  hover:       { fill: 0x88bbff, fillAlpha: 0.5,  stroke: 0xccddff, strokeAlpha: 1,    strokeWidth: 2.5 * DPR },
+  enemyThreat: { fill: 0xcc4444, fillAlpha: 0.4,  stroke: 0xff6666, strokeAlpha: 1,    strokeWidth: 2 * DPR },
+  none:        { fill: 0x000000, fillAlpha: 0,     stroke: 0xffffff, strokeAlpha: 0.25, strokeWidth: 1 * DPR },
 };
 
 /**

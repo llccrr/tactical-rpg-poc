@@ -5,8 +5,8 @@ import type { GridPos } from "../core/grid";
 import { HpBar } from "./HpBar";
 
 /** Cube dimensions in isometric projection */
-const CUBE_W = TILE_WIDTH * 0.45;   // width of the cube footprint
-const CUBE_H = TILE_HEIGHT * 0.45;  // depth of the cube footprint (iso)
+const CUBE_W = Math.round(TILE_WIDTH * 0.45);   // width of the cube footprint
+const CUBE_H = Math.round(TILE_HEIGHT * 0.45);  // depth of the cube footprint (iso)
 const CUBE_ELEVATION = 20 * DPR;    // cube height in pixels
 
 export interface CharacterColors {
@@ -212,7 +212,7 @@ export class Character extends Phaser.GameObjects.Graphics {
 
     // -- Top face (diamond) --
     this.fillStyle(top, 1);
-    this.lineStyle(1.5, c.stroke, 0.5);
+    this.lineStyle(1.5 * DPR, c.stroke, 0.5);
     this.beginPath();
     this.moveTo(0, -el - hh);       // north
     this.lineTo(hw, -el);            // east
@@ -224,7 +224,7 @@ export class Character extends Phaser.GameObjects.Graphics {
 
     // -- Left face --
     this.fillStyle(left, 1);
-    this.lineStyle(1.5, c.stroke, 0.3);
+    this.lineStyle(1.5 * DPR, c.stroke, 0.3);
     this.beginPath();
     this.moveTo(-hw, -el);           // top-left
     this.lineTo(0, -el + hh);       // top-right (south of top face)
@@ -236,7 +236,7 @@ export class Character extends Phaser.GameObjects.Graphics {
 
     // -- Right face --
     this.fillStyle(right, 1);
-    this.lineStyle(1.5, c.stroke, 0.3);
+    this.lineStyle(1.5 * DPR, c.stroke, 0.3);
     this.beginPath();
     this.moveTo(hw, -el);            // top-right
     this.lineTo(0, -el + hh);       // top-left (south of top face)

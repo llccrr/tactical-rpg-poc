@@ -19,7 +19,7 @@ import { ScreenTransition } from "./components/ScreenTransition";
 
 type Screen = "create" | "hub" | "craft" | "fight" | "dungeon-end";
 
-const DPR = Math.min(window.devicePixelRatio || 1, 2);
+const DPR = Math.min(Math.max(window.devicePixelRatio || 1, 1.5), 2);
 
 const BASE_PHASER_CONFIG: Omit<Phaser.Types.Core.GameConfig, "parent"> = {
   type: Phaser.AUTO,
@@ -29,7 +29,9 @@ const BASE_PHASER_CONFIG: Omit<Phaser.Types.Core.GameConfig, "parent"> = {
   scene: [],
   render: {
     antialias: true,
+    antialiasGL: true,
     roundPixels: true,
+    mipmapFilter: "LINEAR_MIPMAP_LINEAR",
   },
   scale: {
     mode: Phaser.Scale.FIT,

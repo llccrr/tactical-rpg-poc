@@ -13,8 +13,37 @@ export const TILE_TEX: Record<Biome, readonly [string, string, string]> = {
   fortress: ["tile_fortress_0", "tile_fortress_1", "tile_fortress_2"],
 };
 
+/**
+ * Weights per texture variant (index matches TILE_TEX arrays).
+ * Semantics: base / tall grass / flowers — 60% / 30% / 10%.
+ * For grass: index 1 = tall grass, index 2 = flowers.
+ * For swamp/crypt/fortress: index 1 = flowers, index 2 = tall grass (swap).
+ */
+export const TILE_WEIGHTS: Record<Biome, readonly [number, number, number]> = {
+  grass:    [70, 27, 3],
+  crypt:    [70, 3, 27],
+  swamp:    [70, 3, 27],
+  fortress: [70, 3, 27],
+};
+
 /** Kept for backward compat — default grass */
 export const TILE_TEX_GRASS = TILE_TEX.grass;
+
+/** Deterministic pseudo-random in [0,1) from (x, y, biome) — avoids diagonal stripes. */
+function hashPos(x: number, y: number, salt: number): number {
+  let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(salt | 0, 2246822519);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h = h ^ (h >>> 16);
+  return (h >>> 0) / 4294967296;
+}
+
+function pickVariant(weights: readonly [number, number, number], r: number): number {
+  const total = weights[0] + weights[1] + weights[2];
+  let t = r * total;
+  if ((t -= weights[0]) < 0) return 0;
+  if ((t -= weights[1]) < 0) return 1;
+  return 2;
+}
 
 /** Diamond half-dimensions */
 const HW = TILE_WIDTH / 2;
@@ -61,9 +90,11 @@ export class Tile extends Phaser.GameObjects.Container {
     this.gridPos = gridPos;
     this.tileType = tileType;
 
-    // Pick a tile variant based on grid position for visual variety
+    // Pick a tile variant via weighted hash of grid position — avoids stripe patterns
     const texKeys = TILE_TEX[biome];
-    const variantIdx = (gridPos.x + gridPos.y * 3) % texKeys.length;
+    const weights = TILE_WEIGHTS[biome];
+    const biomeSalt = biome.charCodeAt(0) * 2654435761;
+    const variantIdx = pickVariant(weights, hashPos(gridPos.x, gridPos.y, biomeSalt));
     const grassKey = texKeys[variantIdx];
 
     if (tileType !== TileType.Obstacle) {

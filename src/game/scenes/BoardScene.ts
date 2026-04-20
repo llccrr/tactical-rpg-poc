@@ -947,20 +947,34 @@ export class BoardScene extends Phaser.Scene {
           : `${enemy.name} poussé de ${pushedCases} case(s)`,
     });
 
-    enemy.pos = finalPos;
     const sprite = this.enemySprites.get(enemy.id);
+
+    // Kill la hit-reaction en cours (shake + flash alpha) AVANT le push :
+    // sinon son onComplete force un setPosition sur l'ancien x/y capturé
+    // au moment du hit, ce qui remet l'ennemi à sa position d'origine et
+    // désynchronise état logique ↔ visuel.
+    if (sprite) {
+      this.tweens.killTweensOf(sprite);
+      const oldScreen = gridToScreen(enemy.pos); // encore l'ancienne position
+      sprite.setPosition(oldScreen.x, oldScreen.y);
+      sprite.alpha = 1;
+      sprite.syncHpBarPosition();
+    }
+
+    enemy.pos = finalPos;
     if (sprite) {
       const target = gridToScreen(finalPos);
       this.tweens.add({
         targets: sprite,
         x: target.x,
         y: target.y,
-        duration: 180,
+        duration: 220,
         ease: "Sine.easeOut",
         onUpdate: () => sprite.syncHpBarPosition(),
         onComplete: () => {
           sprite.gridPos = { ...finalPos };
           sprite.setDepth(100 + finalPos.y * 10);
+          sprite.alpha = 1;
         },
       });
     }

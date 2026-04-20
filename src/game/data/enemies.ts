@@ -9,8 +9,9 @@ import { makeResistances, type Resistances } from "./elements";
  * - ranged: keeps distance, attacks from afar
  * - tank: slow, high HP/def, tries to position between player and allies
  * - boss: enhanced AI \u2014 picks best spell, repositions smartly
+ * - dummy: passes its turn (never moves, never attacks) \u2014 training sandbox
  */
-export type EnemyBehavior = "melee" | "ranged" | "tank" | "boss";
+export type EnemyBehavior = "melee" | "ranged" | "tank" | "boss" | "dummy";
 
 /** Template definition (no position, resistances stored as a partial pour l'auteur). */
 export type EnemyDef = Omit<EnemyState, "pos" | "resistances"> & {
@@ -156,6 +157,17 @@ export const ENEMY_DEFS: Record<string, EnemyDef> = {
     resistances: { feu: 0.5, neutre: 0.3, terre: 0.2 },
     spells: [{ name: "Bouclier de flamme", range: 1, cost: 3, damagePercent: 40, element: "feu", damageType: "direct" }],
   },
+  // \u2500\u2500 Training dummy (salle d'entra\u00eenement) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+  training_dummy: {
+    id: "training_dummy",
+    name: "Poutch d'Entra\u00eenement",
+    hp: 2000, maxHp: 2000,
+    attack: 0,
+    moveRange: 0, ap: 0,
+    behavior: "dummy",
+    spells: [],
+  },
+
   archidemon: {
     id: "archidemon",
     name: "Archid\u00e9mon",

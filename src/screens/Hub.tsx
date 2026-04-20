@@ -406,7 +406,91 @@ function DungeonNode({
   );
 }
 
-/* ── Path SVG between nodes ──────────────────────────────── */
+/* \u2500\u2500 Training node (isolated, no path) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
+
+function TrainingNode({
+  dungeon,
+  onStart,
+}: {
+  dungeon: DungeonDef;
+  onStart: () => void;
+}) {
+  const color = "#9a6ad0";
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: "12%",
+        top: "18%",
+        transform: "translate(-50%, -50%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 8,
+        zIndex: 2,
+      }}
+    >
+      <button
+        onClick={onStart}
+        title={dungeon.description}
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 12,
+          border: `2px dashed ${color}`,
+          background: "#141024",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 26,
+          transition: "all 0.2s",
+          boxShadow: `0 0 8px ${color}33`,
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = "scale(1.12)";
+          e.currentTarget.style.boxShadow = `0 0 24px ${color}aa`;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = "scale(1)";
+          e.currentTarget.style.boxShadow = `0 0 8px ${color}33`;
+        }}
+      >
+        {"\uD83C\uDFAF"}
+      </button>
+
+      <div style={{ textAlign: "center", maxWidth: 160 }}>
+        <div
+          style={{
+            fontFamily: "sans-serif",
+            fontSize: "0.82rem",
+            fontWeight: 700,
+            color: "#ddd",
+            lineHeight: 1.2,
+          }}
+        >
+          {dungeon.name}
+        </div>
+        <div
+          style={{
+            fontSize: "0.65rem",
+            fontFamily: "monospace",
+            color,
+            border: `1px solid ${color}88`,
+            borderRadius: 3,
+            padding: "1px 5px",
+            marginTop: 3,
+            display: "inline-block",
+          }}
+        >
+          SANDBOX
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* \u2500\u2500 Path SVG between nodes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 */
 
 function DungeonPaths({ completedDungeons }: { completedDungeons: string[] }) {
   return (
@@ -453,6 +537,9 @@ export function Hub({ player, completedDungeons, onPlayerChange, onStartDungeon,
 
   const classDef = getClassById(player.classId);
   const bonuses = getEquipmentBonuses(player);
+
+  const trainingDungeon = DUNGEONS.find((d) => d.isTraining);
+  const regularDungeons = DUNGEONS.filter((d) => !d.isTraining);
 
   const handleChangeClass = () => {
     const confirmed = window.confirm(
@@ -722,7 +809,7 @@ export function Hub({ player, completedDungeons, onPlayerChange, onStartDungeon,
             Carte des Donjons
           </h1>
           <p style={{ margin: 0, color: "#555", fontSize: "0.8rem" }}>
-            {completedDungeons.length}/{DUNGEONS.length} donjons termines
+            {completedDungeons.length}/{regularDungeons.length} donjons termines
           </p>
         </div>
 
@@ -754,7 +841,7 @@ export function Hub({ player, completedDungeons, onPlayerChange, onStartDungeon,
           <DungeonPaths completedDungeons={completedDungeons} />
 
           {/* Dungeon nodes */}
-          {DUNGEONS.map((d) => (
+          {regularDungeons.map((d) => (
             <DungeonNode
               key={d.id}
               dungeon={d}
@@ -763,6 +850,14 @@ export function Hub({ player, completedDungeons, onPlayerChange, onStartDungeon,
               onStart={() => onStartDungeon(d.id)}
             />
           ))}
+
+          {/* Training room — isolated node, no path connections */}
+          {trainingDungeon && (
+            <TrainingNode
+              dungeon={trainingDungeon}
+              onStart={() => onStartDungeon(trainingDungeon.id)}
+            />
+          )}
         </div>
       </div>
     </div>

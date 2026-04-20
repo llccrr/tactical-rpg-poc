@@ -32,6 +32,16 @@ function formatEvent(event: CombatEvent, state: GameState): string | null {
       return event.result === "victory" ? "--- Victoire ! ---" : "--- Defaite... ---";
     case "info":
       return event.message;
+    case "selfHarm":
+      return `Sacrifice : −${event.amount} HP`;
+    case "stacks": {
+      const target =
+        state.enemies.find((e) => e.id === event.targetId)?.name ?? event.targetId;
+      if (event.action === "apply") {
+        return `+${event.count} stacks ${event.element} sur ${target}`;
+      }
+      return `${target} : tick ${event.element} (${event.count} stacks consommés)`;
+    }
     default:
       return null;
   }

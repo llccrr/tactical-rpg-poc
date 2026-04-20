@@ -32,7 +32,8 @@ export class EnemyCharacter extends Phaser.GameObjects.Container {
     this.gridPos = gridPos;
     const screen = gridToScreen(gridPos);
     this.setPosition(screen.x, screen.y);
-    this.setDepth(10);
+    // Iso Y-sort : plus y est grand (sud), plus l'entité est devant.
+    this.setDepth(100 + gridPos.y * 10);
 
     // Create the sprite image centered in the container
     this.sprite = scene.add.image(0, 0, textureKey);
@@ -219,6 +220,7 @@ export class EnemyCharacter extends Phaser.GameObjects.Container {
           onComplete: () => {
             this.gridPos = { ...path[i] };
             this.hpBar.syncPosition(this.x, this.y);
+            this.setDepth(100 + this.gridPos.y * 10);
             resolve();
           },
         });

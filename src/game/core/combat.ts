@@ -1,5 +1,5 @@
 import type { Spell } from "./gameState";
-import { WEAPON_BASE_DAMAGE, clampResistance, type Resistances } from "../data/elements";
+import { WEAPON_BASE_DAMAGE, clampResistance, RESISTANCE_CAP, type Resistances } from "../data/elements";
 
 /** Attacker side inputs for damage computation. */
 export interface AttackerStats {
@@ -9,6 +9,22 @@ export interface AttackerStats {
 /** Defender side inputs for damage computation. */
 export interface DefenderStats {
   resistances: Resistances;
+  /** Bonus temporaire (ex : Résistance Brutale du Barbare). */
+  resistBuffPercent?: number;
+}
+
+/** Buffs / modifiers temporaires de l'attaquant, utilisés sur une attaque précise. */
+export interface AttackModifiers {
+  /** État courant de la Rage (applique ±20% final). */
+  ragePercent?: number;
+  /** Bonus plat additionnel sur les dégâts finaux (Surmenage +20). */
+  flatBonus?: number;
+  /** Bonus en % additionnel (Frénésie +20). */
+  extraPercentBonus?: number;
+  /** Bonus de distance pour la Charge (20% × cases traversées). */
+  distanceBonusPercent?: number;
+  /** Exécution : +1% par 1% de HP manquant sur la cible. */
+  executionBonus?: boolean;
 }
 
 export interface DamageResult {
@@ -17,35 +33,53 @@ export interface DamageResult {
 }
 
 /**
- * Pipeline de calcul officiel (spec "Mod\u00e8le de d\u00e9g\u00e2ts") :
- *   1. Budget (PA/PF/PP/PS)      \u2192 g\u00e9r\u00e9 en amont (spendPA/PF/PS)
- *   2. Port\u00e9e                    \u2192 valid\u00e9e c\u00f4t\u00e9 UI (range-check)
- *   3. Modificateurs (zone/\u00e9tat) \u2192 pas encore branch\u00e9 (placeholder)
- *   4. Buffs (rage\u2026)             \u2192 attack de l'attaquant (bonus plat)
- *   5. R\u00e9sistances                \u2192 multiplicateur (1 \u2212 res), cap\u00e9 \u00e0 70%
- *   6. Minimum 1                  \u2192 les d\u00e9g\u00e2ts finaux ne descendent jamais sous 1
- *
- * D\u00e9g\u00e2ts directs (attaques) g\u00e9n\u00e8rent PS et d\u00e9clenchent Rage ailleurs ;
- * d\u00e9g\u00e2ts indirects (stacks/DoT) ne g\u00e9n\u00e8rent rien \u2014 mais la formule ici
- * est identique, c'est aux appelants de respecter la r\u00e8gle.
+ * Pipeline de calcul officiel (spec "Modèle de dégâts") :
+ *   1. Budget (PA/PF/PP/PS)      → géré en amont
+ *   2. Portée                    → validée côté UI
+ *   3. Modificateurs (zone/état) → pas encore branché
+ *   4. Buffs (rage, frénésie, surmenage, distance, exécution)
+ *   5. Résistances                → multiplicateur (1 − res), capé à 70%
+ *   6. Minimum 1
  */
 export function computeDamage(
   attacker: AttackerStats,
   defender: DefenderStats,
   spell: Spell,
   defenderHp: number,
+  defenderMaxHp: number = defenderHp,
+  modifiers: AttackModifiers = {},
 ): DamageResult {
-  // \u00c9tape : dommage de base (% de l'arme)
+  // Dégât de base (% de l'arme)
   const weapon = (WEAPON_BASE_DAMAGE * spell.damagePercent) / 100;
 
-  // \u00c9tape 4 : buffs de l'attaquant (attack = puissance plate pour le moment)
-  const buffed = weapon + attacker.attack;
+  // Étape 4 : buffs additifs en % (rage + frénésie + distance + exécution)
+  let percentMultiplier = 1;
 
-  // \u00c9tape 5 : r\u00e9sistance \u00e9l\u00e9mentaire de la cible, cap\u00e9e \u00e0 70%
-  const resist = clampResistance(defender.resistances[spell.element] ?? 0);
-  const afterResist = buffed * (1 - resist);
+  if (modifiers.ragePercent) {
+    percentMultiplier += modifiers.ragePercent / 100;
+  }
+  if (modifiers.extraPercentBonus) {
+    percentMultiplier += modifiers.extraPercentBonus / 100;
+  }
+  if (modifiers.distanceBonusPercent) {
+    percentMultiplier += modifiers.distanceBonusPercent / 100;
+  }
+  if (modifiers.executionBonus) {
+    const missingPct = defenderMaxHp > 0 ? (1 - defenderHp / defenderMaxHp) : 0;
+    percentMultiplier += missingPct;
+  }
 
-  // \u00c9tape 6 : minimum 1
+  // attack = puissance plate (stuff, etc.) ; flatBonus = Surmenage
+  const afterFlat = weapon + attacker.attack + (modifiers.flatBonus ?? 0);
+  const buffed = afterFlat * percentMultiplier;
+
+  // Étape 5 : résistance élémentaire de la cible, capée à 70%
+  const baseResist = defender.resistances[spell.element] ?? 0;
+  const buffResist = defender.resistBuffPercent ? defender.resistBuffPercent / 100 : 0;
+  const totalResist = Math.min(RESISTANCE_CAP, clampResistance(baseResist) + buffResist);
+  const afterResist = buffed * (1 - totalResist);
+
+  // Étape 6 : minimum 1
   const damage = Math.max(1, Math.floor(afterResist));
 
   return { damage, killed: defenderHp - damage <= 0 };

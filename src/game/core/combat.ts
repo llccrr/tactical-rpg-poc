@@ -34,7 +34,7 @@ export interface DamageResult {
 
 /**
  * Pipeline de calcul officiel (spec "Modèle de dégâts") :
- *   1. Budget (PA/PF/PP/PS)      → géré en amont
+ *   1. Budget (PA/PF/PM/PS)      → géré en amont
  *   2. Portée                    → validée côté UI
  *   3. Modificateurs (zone/état) → pas encore branché
  *   4. Buffs (rage, frénésie, surmenage, distance, exécution)

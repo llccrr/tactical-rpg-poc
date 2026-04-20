@@ -7,7 +7,7 @@ interface GameHUDProps {
   state: GameState | null;
   onSelectSpell: (index: number) => void;
   onEndTurn: () => void;
-  onConvertPS?: (type: "pp" | "pf" | "pa") => void;
+  onConvertPS?: (type: "pm" | "pf" | "pa") => void;
 }
 
 /* ── Small SVG icons ─────────────────────────────── */
@@ -95,7 +95,7 @@ function HPBar({ value, max }: { value: number; max: number }) {
   );
 }
 
-/* ── Point counter (PA / PF / PP / PS) ───────────── */
+/* ── Point counter (PA / PF / PM / PS) ───────────── */
 
 function PointCounter({
   icon,
@@ -384,7 +384,7 @@ function SpellTooltip({
           {spell.psCost} PS
         </TooltipBadge>
       )}
-      {(spell.ppCost ?? 0) > 0 && <TooltipBadge color="#facc15">{spell.ppCost} PP</TooltipBadge>}
+      {(spell.pmCost ?? 0) > 0 && <TooltipBadge color="#facc15">{spell.pmCost} PM</TooltipBadge>}
       <TooltipBadge color="#aaa" background="#ffffff0a" borderColor="#ffffff18">
         {rangeText} PO
       </TooltipBadge>
@@ -517,7 +517,7 @@ function SpellSlot({
         <div style={{ display: "flex", gap: 2, marginTop: 1 }}>
           {(spell.pfCost ?? 0) > 0 && <CostChip value={spell.pfCost!} color="#c084fc" />}
           {(spell.psCost ?? 0) > 0 && <CostChip value={spell.psCost!} color="#f87171" />}
-          {(spell.ppCost ?? 0) > 0 && <CostChip value={spell.ppCost!} color="#facc15" />}
+          {(spell.pmCost ?? 0) > 0 && <CostChip value={spell.pmCost!} color="#facc15" />}
         </div>
 
         {/* Badge coût PA principal */}
@@ -679,7 +679,7 @@ function NextAttackBuffs({
 /* ── PS conversion button ────────────────────────── */
 
 const PS_CONV_CONFIG = {
-  pp: { cost: 2, label: "2 PS → 1 PP", maxPerTurn: 5, color: "#facc15", icon: "🟡" },
+  pm: { cost: 2, label: "2 PS → 1 PM", maxPerTurn: 5, color: "#facc15", icon: "🟡" },
   pf: { cost: 5, label: "5 PS → 1 PF", maxPerTurn: 1, color: "#c084fc", icon: "🟣" },
   pa: { cost: 10, label: "10 PS → 1 PA", maxPerTurn: 1, color: "#60a5fa", icon: "🔵" },
 } as const;
@@ -691,7 +691,7 @@ function PSConversionButton({
   disabled,
   onClick,
 }: {
-  type: "pp" | "pf" | "pa";
+  type: "pm" | "pf" | "pa";
   remainingPS: number;
   usedThisTurn: number;
   disabled: boolean;
@@ -765,7 +765,7 @@ export function GameHUD({ state, onSelectSpell, onEndTurn, onConvertPS }: GameHU
     if (state.remainingPA < spell.cost) return false;
     if ((spell.pfCost ?? 0) > state.remainingPF) return false;
     if ((spell.psCost ?? 0) > state.remainingPS) return false;
-    if ((spell.ppCost ?? 0) > state.remainingPM) return false;
+    if ((spell.pmCost ?? 0) > state.remainingPM) return false;
     if (spell.id) {
       if ((character.cooldowns[spell.id] ?? 0) > 0) return false;
       if (spell.usesPerTurn != null) {
@@ -803,7 +803,7 @@ export function GameHUD({ state, onSelectSpell, onEndTurn, onConvertPS }: GameHU
             pointerEvents: "auto",
           }}
         >
-          {(["pp", "pf", "pa"] as const).map((type) => (
+          {(["pm", "pf", "pa"] as const).map((type) => (
             <PSConversionButton
               key={type}
               type={type}
@@ -883,7 +883,7 @@ export function GameHUD({ state, onSelectSpell, onEndTurn, onConvertPS }: GameHU
               suffix={`+${character.moveRange}`}
               color="#facc15"
               bgColor="#facc1511"
-              tooltipTitle="PP — Points de Placement"
+              tooltipTitle="PM — Points de Mouvement"
               tooltipBadges={
                 <>
                   <TooltipBadge color="#facc15">{state.remainingPM} restants</TooltipBadge>
@@ -1156,7 +1156,7 @@ export function EnemyTooltip({ state }: { state: GameState | null }) {
 
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <StatPill label="ATQ" value={enemy.attack} color="#fb923c" />
-            <StatPill label="PP" value={enemy.moveRange} color="#facc15" />
+            <StatPill label="PM" value={enemy.moveRange} color="#facc15" />
             <StatPill label="PA" value={enemy.ap} color="#a78bfa" />
           </div>
 

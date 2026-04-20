@@ -78,7 +78,7 @@ function ClassCard({
           if (spell.cost > 0) costs.push(`${spell.cost}PA`);
           if (spell.pfCost) costs.push(`${spell.pfCost}PF`);
           if (spell.psCost) costs.push(`${spell.psCost}PS`);
-          if (spell.ppCost) costs.push(`${spell.ppCost}PP`);
+          if (spell.pmCost) costs.push(`${spell.pmCost}PM`);
           return (
             <div
               key={i}

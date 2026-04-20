@@ -202,7 +202,7 @@ export class BoardScene extends Phaser.Scene {
   }
 
   /** Called from React when a PS conversion button is clicked */
-  convertPS(type: "pp" | "pf" | "pa"): void {
+  convertPS(type: "pm" | "pf" | "pa"): void {
     if (this.state.fightResult !== "ongoing") return;
     if (!this.fight.convertPS(type)) return;
     this.emitState();
@@ -693,7 +693,7 @@ export class BoardScene extends Phaser.Scene {
     }
     if (spell.gainsPm) {
       this.fight.addPM(spell.gainsPm);
-      this.eventBus.emit({ type: "info", message: `+${spell.gainsPm} PP (${spell.name})` });
+      this.eventBus.emit({ type: "info", message: `+${spell.gainsPm} PM (${spell.name})` });
     }
     if (spell.nextAttackFlat) {
       this.fight.addNextAttackFlat(spell.nextAttackFlat);

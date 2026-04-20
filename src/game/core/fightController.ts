@@ -37,18 +37,18 @@ export class FightController {
     return this.isPlayerTurn() && this.state.remainingPS >= psCost;
   }
 
-  /** Whether the player has enough PP for a given cost */
-  canPlayerAffordPP(ppCost: number): boolean {
-    return this.isPlayerTurn() && this.state.remainingPM >= ppCost;
+  /** Whether the player has enough PM for a given cost */
+  canPlayerAffordPM(pmCost: number): boolean {
+    return this.isPlayerTurn() && this.state.remainingPM >= pmCost;
   }
 
-  /** Full cost-check : PA + PF + PS + PP + cooldown + usesPerTurn. */
+  /** Full cost-check : PA + PF + PS + PM + cooldown + usesPerTurn. */
   canCastSpell(spell: Spell): boolean {
     if (!this.isPlayerTurn()) return false;
     if (this.state.remainingPA < spell.cost) return false;
     if ((spell.pfCost ?? 0) > this.state.remainingPF) return false;
     if ((spell.psCost ?? 0) > this.state.remainingPS) return false;
-    if ((spell.ppCost ?? 0) > this.state.remainingPM) return false;
+    if ((spell.pmCost ?? 0) > this.state.remainingPM) return false;
     if (spell.id) {
       if ((this.state.character.cooldowns[spell.id] ?? 0) > 0) return false;
       if (spell.usesPerTurn != null) {
@@ -64,7 +64,7 @@ export class FightController {
     this.state.remainingPA += amount;
   }
 
-  /** Add PM (spec Sacrifice de Chair +2 PP). */
+  /** Add PM (spec Sacrifice de Chair +2 PM). */
   addPM(amount: number): void {
     this.state.remainingPM += amount;
   }
@@ -102,12 +102,12 @@ export class FightController {
     return true;
   }
 
-  /** Paie tous les coûts d'un sort d'un coup (PA + PF + PS + PP). */
+  /** Paie tous les coûts d'un sort d'un coup (PA + PF + PS + PM). */
   paySpellCosts(spell: Spell): void {
     if (spell.cost > 0) this.spendPA(spell.cost);
     if (spell.pfCost) this.spendPF(spell.pfCost);
     if (spell.psCost) this.spendPS(spell.psCost);
-    if (spell.ppCost) this.spendPM(spell.ppCost);
+    if (spell.pmCost) this.spendPM(spell.pmCost);
   }
 
   /**
@@ -229,17 +229,17 @@ export class FightController {
     delete this.state.targetStacks[targetId];
   }
 
-  // ── PS Conversion (Blood Points → PA / PF / PP) ──────────
+  // ── PS Conversion (Blood Points → PA / PF / PM) ──────────
 
   /** Conversion rates and per-turn limits (spec Edouard). */
   private static readonly PS_CONVERSION = {
-    pp: { cost: 2, gain: 1, maxPerTurn: 5 },
+    pm: { cost: 2, gain: 1, maxPerTurn: 5 },
     pf: { cost: 5, gain: 1, maxPerTurn: 1 },
     pa: { cost: 10, gain: 1, maxPerTurn: 1 },
   } as const;
 
   /** Whether a given PS conversion is currently possible. */
-  canConvertPS(type: "pp" | "pf" | "pa"): boolean {
+  canConvertPS(type: "pm" | "pf" | "pa"): boolean {
     if (!this.isPlayerTurn()) return false;
     const cfg = FightController.PS_CONVERSION[type];
     if (this.state.remainingPS < cfg.cost) return false;
@@ -251,18 +251,18 @@ export class FightController {
    * Execute a PS → resource conversion. Returns false if not possible.
    * Does NOT trigger Rage or PS-gain effects.
    */
-  convertPS(type: "pp" | "pf" | "pa"): boolean {
+  convertPS(type: "pm" | "pf" | "pa"): boolean {
     if (!this.canConvertPS(type)) return false;
     const cfg = FightController.PS_CONVERSION[type];
 
     this.state.remainingPS -= cfg.cost;
     this.state.psConversions[type] += cfg.gain;
 
-    if (type === "pp") this.state.remainingPM += cfg.gain;
+    if (type === "pm") this.state.remainingPM += cfg.gain;
     else if (type === "pf") this.state.remainingPF += cfg.gain;
     else this.state.remainingPA += cfg.gain;
 
-    const labels = { pp: "PP", pf: "PF", pa: "PA" };
+    const labels = { pm: "PM", pf: "PF", pa: "PA" };
     this.eventBus.emit({
       type: "info",
       message: `Conversion : −${cfg.cost} PS → +${cfg.gain} ${labels[type]}`,
@@ -303,7 +303,7 @@ export class FightController {
   }
 
   /** End the enemy phase and start a new player turn.
-   *  Spec Edouard : PA, PF et PP cappent à leur base chaque tour (pas de stack).
+   *  Spec Edouard : PA, PF et PM cappent à leur base chaque tour (pas de stack).
    *  PS ne régénère pas (cap psMax, ne monte que via dégâts infligés/subis). */
   endEnemyPhase(): void {
     this.state.currentTurn = "player";
@@ -313,7 +313,7 @@ export class FightController {
     this.state.remainingPF = this.state.character.pf;
 
     // Reset des conversions PS par tour
-    this.state.psConversions = { pp: 0, pf: 0, pa: 0 };
+    this.state.psConversions = { pm: 0, pf: 0, pa: 0 };
 
     // Décrément des cooldowns
     for (const id of Object.keys(this.state.character.cooldowns)) {

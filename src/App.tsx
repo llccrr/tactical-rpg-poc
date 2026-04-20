@@ -231,7 +231,7 @@ export default function App() {
   const handleReset = () => sceneRef.current?.resetBoard();
   const handleSelectSpell = (index: number) => sceneRef.current?.selectSpell(index);
   const handleEndTurn = () => sceneRef.current?.endTurn();
-  const handleConvertPS = (type: "pp" | "pf" | "pa") => sceneRef.current?.convertPS(type);
+  const handleConvertPS = (type: "pm" | "pf" | "pa") => sceneRef.current?.convertPS(type);
 
   // ── Overlay labels ──────────────────────────────────────────
 

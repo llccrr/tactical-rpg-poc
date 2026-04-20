@@ -9,7 +9,7 @@ export interface ClassDefinition {
   baseAttack: number;
   /** Résistances natives de la classe (facultatif, 0 sinon). */
   resistances?: Partial<Resistances>;
-  /** PP gained per turn (spec : 4) */
+  /** PM gained per turn (spec : 4) */
   basePm: number;
   /** PA gained per turn (spec : 1) */
   basePa: number;
@@ -77,7 +77,7 @@ const BARBARE_SPELLS: Spell[] = [
     damagePercent: 0,
     element: "neutre",
     damageType: "indirect",
-    description: "Sacrifie 20% des HP actuels, gagne +2 PP immédiatement.",
+    description: "Sacrifie 20% des HP actuels, gagne +2 PM immédiatement.",
     cooldown: 1,
     targetMode: "self",
     selfHarmPercent: 20,
@@ -119,7 +119,7 @@ const BARBARE_SPELLS: Spell[] = [
     name: "Charge",
     range: 6,
     cost: 1,
-    ppCost: 2,
+    pmCost: 2,
     damagePercent: 100,
     element: "neutre",
     damageType: "direct",

@@ -39,8 +39,8 @@ export interface Spell {
   pfCost?: number;
   /** PS (Points de Sang) cost. */
   psCost?: number;
-  /** PP (Points de Placement) cost. */
-  ppCost?: number;
+  /** PM (Points de Mouvement) cost. */
+  pmCost?: number;
   /** Pourcentage de d\u00e9g\u00e2ts d'arme (100 = 1\u00d7 l'arme = 10 d\u00e9g\u00e2ts bruts). */
   damagePercent: number;
   element: Element;
@@ -58,7 +58,7 @@ export interface Spell {
 
   /** % des HP actuels sacrifi\u00e9s \u00e0 l'utilisation (Sacrifice de Chair, Surmenage). */
   selfHarmPercent?: number;
-  /** PP gagn\u00e9s \u00e0 l'utilisation (Sacrifice de Chair). */
+  /** PM gagn\u00e9s \u00e0 l'utilisation (Sacrifice de Chair). */
   gainsPm?: number;
   /** Bonus plat de d\u00e9g\u00e2ts finaux sur la prochaine attaque (Surmenage). */
   nextAttackFlat?: number;
@@ -90,7 +90,7 @@ export interface CharacterState {
   attack: number;
   /** R\u00e9sistances par \u00e9l\u00e9ment (0..0.7). Appliqu\u00e9es en \u00e9tape 5 du calcul. */
   resistances: Resistances;
-  /** PP gained at the start of each player turn (spec : 4) */
+  /** PM gained at the start of each player turn (spec : 4) */
   moveRange: number;
   /** PA gained at the start of each player turn (spec : 1) */
   ap: number;
@@ -143,8 +143,8 @@ export type FightResult = "ongoing" | "victory" | "defeat";
 
 /** Tracks how many PS conversions have been used this turn (per type). */
 export interface PSConversions {
-  /** PP gained via PS conversion this turn (limit: 5) */
-  pp: number;
+  /** PM gained via PS conversion this turn (limit: 5) */
+  pm: number;
   /** PF gained via PS conversion this turn (limit: 1) */
   pf: number;
   /** PA gained via PS conversion this turn (limit: 1) */
@@ -265,7 +265,7 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig, bon
     fightResult: "ongoing",
     combatLog: [],
     targetStacks: {},
-    psConversions: { pp: 0, pf: 0, pa: 0 },
+    psConversions: { pm: 0, pf: 0, pa: 0 },
   };
 }
 

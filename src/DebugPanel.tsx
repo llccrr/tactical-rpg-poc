@@ -98,7 +98,7 @@ export function DebugPanel({
           <span style={{ color: "#666" }}> (+{character.pf}/tour)</span>
         </div>
         <div>
-          <strong style={{ color: "#facc15" }}>PP</strong> {state.remainingPM}
+          <strong style={{ color: "#facc15" }}>PM</strong> {state.remainingPM}
           <span style={{ color: "#666" }}> (+{character.moveRange}/tour)</span>
         </div>
         <div>

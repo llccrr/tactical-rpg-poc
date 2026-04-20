@@ -231,6 +231,7 @@ export default function App() {
   const handleReset = () => sceneRef.current?.resetBoard();
   const handleSelectSpell = (index: number) => sceneRef.current?.selectSpell(index);
   const handleEndTurn = () => sceneRef.current?.endTurn();
+  const handleConvertPS = (type: "pp" | "pf" | "pa") => sceneRef.current?.convertPS(type);
 
   // ── Overlay labels ──────────────────────────────────────────
 
@@ -367,7 +368,7 @@ export default function App() {
         )}
         <CombatLog state={gameState} />
         <EnemyTooltip state={gameState} />
-        <GameHUD state={gameState} onSelectSpell={handleSelectSpell} onEndTurn={handleEndTurn} />
+        <GameHUD state={gameState} onSelectSpell={handleSelectSpell} onEndTurn={handleEndTurn} onConvertPS={handleConvertPS} />
         {gameState && (
           <FightResultOverlay
             result={gameState.fightResult}

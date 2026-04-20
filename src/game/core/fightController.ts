@@ -229,6 +229,48 @@ export class FightController {
     delete this.state.targetStacks[targetId];
   }
 
+  // ── PS Conversion (Blood Points → PA / PF / PP) ──────────
+
+  /** Conversion rates and per-turn limits (spec Edouard). */
+  private static readonly PS_CONVERSION = {
+    pp: { cost: 2, gain: 1, maxPerTurn: 5 },
+    pf: { cost: 5, gain: 1, maxPerTurn: 1 },
+    pa: { cost: 10, gain: 1, maxPerTurn: 1 },
+  } as const;
+
+  /** Whether a given PS conversion is currently possible. */
+  canConvertPS(type: "pp" | "pf" | "pa"): boolean {
+    if (!this.isPlayerTurn()) return false;
+    const cfg = FightController.PS_CONVERSION[type];
+    if (this.state.remainingPS < cfg.cost) return false;
+    if (this.state.psConversions[type] >= cfg.maxPerTurn) return false;
+    return true;
+  }
+
+  /**
+   * Execute a PS → resource conversion. Returns false if not possible.
+   * Does NOT trigger Rage or PS-gain effects.
+   */
+  convertPS(type: "pp" | "pf" | "pa"): boolean {
+    if (!this.canConvertPS(type)) return false;
+    const cfg = FightController.PS_CONVERSION[type];
+
+    this.state.remainingPS -= cfg.cost;
+    this.state.psConversions[type] += cfg.gain;
+
+    if (type === "pp") this.state.remainingPM += cfg.gain;
+    else if (type === "pf") this.state.remainingPF += cfg.gain;
+    else this.state.remainingPA += cfg.gain;
+
+    const labels = { pp: "PP", pf: "PF", pa: "PA" };
+    this.eventBus.emit({
+      type: "info",
+      message: `Conversion : −${cfg.cost} PS → +${cfg.gain} ${labels[type]}`,
+    });
+
+    return true;
+  }
+
   // ── Turn transitions ──────────────────────────────────────
 
   /** End the player's turn, switch to enemy phase */
@@ -269,6 +311,9 @@ export class FightController {
     this.state.remainingPM = this.state.character.moveRange;
     this.state.remainingPA = this.state.character.ap;
     this.state.remainingPF = this.state.character.pf;
+
+    // Reset des conversions PS par tour
+    this.state.psConversions = { pp: 0, pf: 0, pa: 0 };
 
     // Décrément des cooldowns
     for (const id of Object.keys(this.state.character.cooldowns)) {

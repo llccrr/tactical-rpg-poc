@@ -201,6 +201,13 @@ export class BoardScene extends Phaser.Scene {
     this.emitState();
   }
 
+  /** Called from React when a PS conversion button is clicked */
+  convertPS(type: "pp" | "pf" | "pa"): void {
+    if (this.state.fightResult !== "ongoing") return;
+    if (!this.fight.convertPS(type)) return;
+    this.emitState();
+  }
+
   /** Called from React when End Turn button is clicked */
   endTurn(): void {
     if (this.state.fightResult !== "ongoing") return;

@@ -7,6 +7,7 @@ interface GameHUDProps {
   state: GameState | null;
   onSelectSpell: (index: number) => void;
   onEndTurn: () => void;
+  onConvertPS?: (type: "pp" | "pf" | "pa") => void;
 }
 
 /* ── Small SVG icons ─────────────────────────────── */
@@ -675,9 +676,86 @@ function NextAttackBuffs({
   );
 }
 
+/* ── PS conversion button ────────────────────────── */
+
+const PS_CONV_CONFIG = {
+  pp: { cost: 2, label: "2 PS → 1 PP", maxPerTurn: 5, color: "#facc15", icon: "🟡" },
+  pf: { cost: 5, label: "5 PS → 1 PF", maxPerTurn: 1, color: "#c084fc", icon: "🟣" },
+  pa: { cost: 10, label: "10 PS → 1 PA", maxPerTurn: 1, color: "#60a5fa", icon: "🔵" },
+} as const;
+
+function PSConversionButton({
+  type,
+  remainingPS,
+  usedThisTurn,
+  disabled,
+  onClick,
+}: {
+  type: "pp" | "pf" | "pa";
+  remainingPS: number;
+  usedThisTurn: number;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const [hovered, setHovered] = useState(false);
+  const cfg = PS_CONV_CONFIG[type];
+  const limitReached = usedThisTurn >= cfg.maxPerTurn;
+  const notEnoughPS = remainingPS < cfg.cost;
+  const isDisabled = disabled || limitReached || notEnoughPS;
+
+  const tooltipLines = [
+    `Coût : ${cfg.cost} PS`,
+    `Limite : ${cfg.maxPerTurn} / tour (utilisé : ${usedThisTurn})`,
+    ...(limitReached ? ["Limite atteinte ce tour."] : []),
+    ...(notEnoughPS && !limitReached ? ["PS insuffisants."] : []),
+  ];
+
+  return (
+    <div
+      style={{ position: "relative" }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {hovered && (
+        <HoverTooltip
+          title={`Conversion ${type.toUpperCase()}`}
+          badges={
+            <TooltipBadge color={cfg.color}>{cfg.label}</TooltipBadge>
+          }
+          description={tooltipLines}
+        />
+      )}
+      <button
+        onClick={onClick}
+        disabled={isDisabled}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 3,
+          padding: "3px 7px",
+          background: isDisabled ? "#15151f" : `${cfg.color}18`,
+          border: `1px solid ${isDisabled ? "#2a2a3e" : `${cfg.color}55`}`,
+          borderRadius: 4,
+          cursor: isDisabled ? "default" : "pointer",
+          outline: "none",
+          fontFamily: "monospace",
+          fontSize: 10,
+          fontWeight: 700,
+          color: isDisabled ? "#444" : cfg.color,
+          transition: "all 0.15s",
+          whiteSpace: "nowrap",
+        }}
+      >
+        <span style={{ fontSize: 9 }}>{cfg.icon}</span>
+        {cfg.cost}→{type.toUpperCase()}
+      </button>
+    </div>
+  );
+}
+
 /* ── Main HUD ────────────────────────────────────── */
 
-export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
+export function GameHUD({ state, onSelectSpell, onEndTurn, onConvertPS }: GameHUDProps) {
   if (!state) return null;
 
   const { character } = state;
@@ -706,10 +784,37 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
         left: 0,
         right: 0,
         display: "flex",
-        justifyContent: "center",
+        flexDirection: "column",
+        alignItems: "center",
         pointerEvents: "none",
       }}
     >
+      {/* ── PS Conversion buttons (above the bar) ── */}
+      {state.remainingPS > 0 && (
+        <div
+          style={{
+            display: "flex",
+            gap: 4,
+            padding: "4px 10px",
+            background: "linear-gradient(to top, #14141f 0%, #0c0c14cc 100%)",
+            border: "1px solid #2a2a3e",
+            borderBottom: "none",
+            borderRadius: "8px 8px 0 0",
+            pointerEvents: "auto",
+          }}
+        >
+          {(["pp", "pf", "pa"] as const).map((type) => (
+            <PSConversionButton
+              key={type}
+              type={type}
+              remainingPS={state.remainingPS}
+              usedThisTurn={state.psConversions[type]}
+              disabled={!isPlayerTurn}
+              onClick={() => onConvertPS?.(type)}
+            />
+          ))}
+        </div>
+      )}
       <div
         style={{
           display: "flex",

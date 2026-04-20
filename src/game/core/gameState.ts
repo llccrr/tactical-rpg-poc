@@ -141,6 +141,16 @@ export interface EnemyState {
 
 export type FightResult = "ongoing" | "victory" | "defeat";
 
+/** Tracks how many PS conversions have been used this turn (per type). */
+export interface PSConversions {
+  /** PP gained via PS conversion this turn (limit: 5) */
+  pp: number;
+  /** PF gained via PS conversion this turn (limit: 1) */
+  pf: number;
+  /** PA gained via PS conversion this turn (limit: 1) */
+  pa: number;
+}
+
 export interface GameState {
   tiles: TileType[][];
   character: CharacterState;
@@ -159,6 +169,8 @@ export interface GameState {
   hoveredEnemyId?: string | null;
   /** Stacks \u00e9l\u00e9mentaires appliqu\u00e9s sur chaque cible (ennemi). */
   targetStacks: Record<string, Partial<Record<Element, number>>>;
+  /** Conversions PS effectuées ce tour (limites par tour). */
+  psConversions: PSConversions;
 }
 
 /** Config for a single dungeon room — overrides default enemies and optionally player HP */
@@ -253,6 +265,7 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig, bon
     fightResult: "ongoing",
     combatLog: [],
     targetStacks: {},
+    psConversions: { pp: 0, pf: 0, pa: 0 },
   };
 }
 

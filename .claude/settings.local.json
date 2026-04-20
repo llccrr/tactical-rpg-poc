@@ -46,7 +46,8 @@
       "Bash(pip3 install:*)",
       "Bash(find /Users/llccrr/dev/tactical-rpg-poc -type f -name *gameState* -o -name *game-state*)",
       "Bash(grep -r \"crypt\\\\|swamp\\\\|fortress\\\\|goblin cave\" /Users/llccrr/dev/tactical-rpg-poc/src --include=*.ts --include=*.tsx)",
-      "Bash(grep -r \"TILE_TEX\\\\|texture.*key\\\\|preload\" /Users/llccrr/dev/tactical-rpg-poc/src --include=*.ts)"
+      "Bash(grep -r \"TILE_TEX\\\\|texture.*key\\\\|preload\" /Users/llccrr/dev/tactical-rpg-poc/src --include=*.ts)",
+      "WebFetch(domain:www.notion.so)"
     ]
   }
 }

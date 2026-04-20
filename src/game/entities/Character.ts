@@ -57,7 +57,8 @@ export class Character extends Phaser.GameObjects.Graphics {
     this.gridPos = gridPos;
     const screen = gridToScreen(gridPos);
     this.setPosition(screen.x, screen.y);
-    this.setDepth(10);
+    // Iso Y-sort : plus y est grand (sud), plus l'entité est devant.
+    this.setDepth(100 + gridPos.y * 10);
     this.draw();
 
     this.hpBar = new HpBar(scene);
@@ -188,6 +189,7 @@ export class Character extends Phaser.GameObjects.Graphics {
           onComplete: () => {
             this.gridPos = { ...path[i] };
             this.hpBar.syncPosition(this.x, this.y);
+            this.setDepth(100 + this.gridPos.y * 10);
             resolve();
           },
         });

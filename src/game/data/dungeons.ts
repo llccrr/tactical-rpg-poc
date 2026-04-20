@@ -19,9 +19,27 @@ export interface DungeonDef {
   biome: Biome;
   rooms: RoomDef[];
   lootTable: LootEntry[];
+  /** Training sandbox: no loot, no completion tracking. */
+  isTraining?: boolean;
 }
 
 export const DUNGEONS: DungeonDef[] = [
+  {
+    id: "salle_entrainement",
+    name: "Salle d'Entra\u00eenement",
+    description: "Un poutch inerte avec 2000 PV qui passe son tour. Parfait pour tester tes sorts et ta classe.",
+    tier: 1,
+    biome: "grass",
+    isTraining: true,
+    rooms: [
+      {
+        enemies: [
+          { defId: "training_dummy", pos: { x: 7, y: 4 } },
+        ],
+      },
+    ],
+    lootTable: [],
+  },
   {
     id: "caverne_gobelins",
     name: "Caverne des Gobelins",

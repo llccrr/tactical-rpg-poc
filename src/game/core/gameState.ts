@@ -9,6 +9,10 @@ import type { StatBonuses } from "../data/items";
 import type { Element, Resistances } from "../data/elements";
 import { makeResistances } from "../data/elements";
 
+export type RageState = "neutral" | "enraged" | "punished";
+
+export type TargetMode = "enemy" | "self" | "line-charge";
+
 export enum TileType {
   Empty = "empty",
   Obstacle = "obstacle",
@@ -26,15 +30,57 @@ export enum ActionMode {
  * pas de PS et ne d\u00e9clenchent pas Rage.
  */
 export interface Spell {
+  /** Identifiant stable pour cooldowns / uses par tour. */
+  id?: string;
   name: string;
   range: number;
   cost: number; // PA cost
+  /** PF (Points de Fonction) cost. */
+  pfCost?: number;
+  /** PS (Points de Sang) cost. */
+  psCost?: number;
+  /** PP (Points de Placement) cost. */
+  ppCost?: number;
   /** Pourcentage de d\u00e9g\u00e2ts d'arme (100 = 1\u00d7 l'arme = 10 d\u00e9g\u00e2ts bruts). */
   damagePercent: number;
   element: Element;
   damageType?: "direct" | "indirect";
   rangeMin?: number;
   description?: string;
+
+  /** Palier de cooldown (spec Edouard : 0/1/2/3 tours). */
+  cooldown?: 0 | 1 | 2 | 3;
+  /** Limite d'utilisations par tour (ex : Coup Gratuit = 1/tour). */
+  usesPerTurn?: number;
+
+  /** Mode de ciblage. enemy = cible ennemie, self = soi-m\u00eame, line-charge = charge en ligne droite. */
+  targetMode?: TargetMode;
+
+  /** % des HP actuels sacrifi\u00e9s \u00e0 l'utilisation (Sacrifice de Chair, Surmenage). */
+  selfHarmPercent?: number;
+  /** PP gagn\u00e9s \u00e0 l'utilisation (Sacrifice de Chair). */
+  gainsPm?: number;
+  /** Bonus plat de d\u00e9g\u00e2ts finaux sur la prochaine attaque (Surmenage). */
+  nextAttackFlat?: number;
+  /** Bonus en % sur la prochaine attaque (Fr\u00e9n\u00e9sie). */
+  nextAttackPercent?: number;
+  /** Active la Rage imm\u00e9diatement (Fr\u00e9n\u00e9sie). */
+  activatesRage?: boolean;
+
+  /** Pouss\u00e9e en cases dans le sens attaquant \u2192 cible (Intimidation). */
+  pushDistance?: number;
+  /** Bonus en % par case travers\u00e9e (Charge). */
+  distanceBonusPercent?: number;
+
+  /** % de r\u00e9sistance tous \u00e9l\u00e9ments pendant X tours (R\u00e9sistance Brutale). */
+  resistBuffPercent?: number;
+  resistBuffTurns?: number;
+
+  /** Bonus de d\u00e9g\u00e2ts sur cible basse HP (Ex\u00e9cution). */
+  executionBonus?: boolean;
+
+  /** Applique des stacks \u00e9l\u00e9mentaires sur la cible touch\u00e9e (Entaille). */
+  applyStacks?: { element: Element; count: number };
 }
 
 export interface CharacterState {
@@ -54,6 +100,28 @@ export interface CharacterState {
   psMax: number;
   selected: boolean;
   spells: Spell[];
+
+  /** La classe poss\u00e8de le passif Rage (Barbare). */
+  hasRagePassive: boolean;
+  /** \u00c9tat courant de Rage pour ce tour. neutral = pas de modificateur. */
+  rageState: RageState;
+  /** Vrai si le personnage a inflig\u00e9 au moins 1 d\u00e9g\u00e2t direct pendant ce tour. */
+  didDamageThisTurn: boolean;
+
+  /** Bonus plat sur les d\u00e9g\u00e2ts finaux de la prochaine attaque (Surmenage). */
+  nextAttackFlat: number;
+  /** Bonus en % sur les d\u00e9g\u00e2ts finaux de la prochaine attaque (Fr\u00e9n\u00e9sie). */
+  nextAttackPercent: number;
+
+  /** Bonus temporaire de r\u00e9sistance tous \u00e9l\u00e9ments (R\u00e9sistance Brutale). */
+  resistBuffPercent: number;
+  /** Nb de tours restants pour le resistBuff (0 = pas de buff). */
+  resistBuffTurns: number;
+
+  /** Cooldowns en cours par spell id (tours restants). */
+  cooldowns: Record<string, number>;
+  /** Utilisations restantes par tour par spell id. */
+  spellUsesRemaining: Record<string, number>;
 }
 
 export interface EnemyState {
@@ -68,7 +136,7 @@ export interface EnemyState {
   moveRange: number;
   ap: number;
   spells: Spell[];
-  behavior: "melee" | "ranged" | "tank" | "boss";
+  behavior: "melee" | "ranged" | "tank" | "boss" | "dummy";
 }
 
 export type FightResult = "ongoing" | "victory" | "defeat";
@@ -89,6 +157,8 @@ export interface GameState {
   combatLog: CombatEvent[];
   /** Currently hovered enemy id (set by BoardScene pointer events) */
   hoveredEnemyId?: string | null;
+  /** Stacks \u00e9l\u00e9mentaires appliqu\u00e9s sur chaque cible (ennemi). */
+  targetStacks: Record<string, Partial<Record<Element, number>>>;
 }
 
 /** Config for a single dungeon room — overrides default enemies and optionally player HP */
@@ -135,6 +205,14 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig, bon
         makeEnemy("slime", { x: 8, y: 7 }, "2"),
       ];
 
+  const spells = classDef.spells.map((s) => ({ ...s }));
+  const spellUsesRemaining: Record<string, number> = {};
+  for (const s of spells) {
+    if (s.id && s.usesPerTurn != null) {
+      spellUsesRemaining[s.id] = s.usesPerTurn;
+    }
+  }
+
   return {
     tiles,
     character: {
@@ -151,7 +229,16 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig, bon
       pf: classDef.basePf,
       psMax: classDef.basePsMax,
       selected: true,
-      spells: [...classDef.spells],
+      spells,
+      hasRagePassive: classDef.hasRagePassive ?? false,
+      rageState: "neutral",
+      didDamageThisTurn: false,
+      nextAttackFlat: 0,
+      nextAttackPercent: 0,
+      resistBuffPercent: 0,
+      resistBuffTurns: 0,
+      cooldowns: {},
+      spellUsesRemaining,
     },
     enemies,
     actionMode: ActionMode.Move,
@@ -165,6 +252,7 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig, bon
     remainingPS: 0,
     fightResult: "ongoing",
     combatLog: [],
+    targetStacks: {},
   };
 }
 

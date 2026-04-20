@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { GRID_COLS, GRID_ROWS, DPR } from "../config";
-import { posKey } from "../core/grid";
+import { posKey, manhattan } from "../core/grid";
 import type { GridPos } from "../core/grid";
 import {
   createInitialState,
@@ -9,8 +9,10 @@ import {
   ActionMode,
   type GameState,
   type RoomConfig,
+  type Spell,
+  type EnemyState,
 } from "../core/gameState";
-import { computeDamage } from "../core/combat";
+import { computeDamage, type AttackModifiers } from "../core/combat";
 import type { StatBonuses } from "../data/items";
 import { FightController } from "../core/fightController";
 import { CombatEventBus } from "../core/events";
@@ -251,9 +253,8 @@ export class BoardScene extends Phaser.Scene {
     this.fight = new FightController(this.state, this.eventBus);
   }
 
-  private canAffordSpell(spell: { cost: number }): boolean {
-    if (!this.fight.isPlayerTurn()) return false;
-    return this.state.remainingPA >= spell.cost;
+  private canAffordSpell(spell: Spell): boolean {
+    return this.fight.canCastSpell(spell);
   }
 
   private createPlayerCharacter(): Character {
@@ -262,6 +263,14 @@ export class BoardScene extends Phaser.Scene {
     char.on("pointerdown", () => {
       if (!this.fight.isPlayerTurn()) return;
       if (char.isMoving) return;
+      // En mode ciblage avec sort self-cast, clic sur soi → valide le sort
+      if (this.state.actionMode === ActionMode.Targeting) {
+        const spell = this.state.character.spells[this.state.activeSpellIndex!];
+        if (spell?.targetMode === "self") {
+          this.handleTileClick(this.state.character.pos);
+          return;
+        }
+      }
       this.switchToMoveMode();
     });
     return char;
@@ -404,6 +413,20 @@ export class BoardScene extends Phaser.Scene {
     const spell = this.state.character.spells[this.state.activeSpellIndex!];
     if (!spell) return;
 
+    // Sort self-cast : surligne uniquement la case du joueur
+    if (spell.targetMode === "self") {
+      const selfKey = posKey(this.state.character.pos);
+      this.spellRangeKeys.add(selfKey);
+      this.tileMap.get(selfKey)?.setSpellRange(true);
+      return;
+    }
+
+    // Charge : surligne les cases en ligne droite (N/S/E/O) jusqu'à obstacle ou cible
+    if (spell.targetMode === "line-charge") {
+      this.showChargeRange(spell.range);
+      return;
+    }
+
     const rangeMin = spell.rangeMin ?? 0;
 
     // Spell range ignores enemies — only obstacles block line of fire
@@ -422,6 +445,46 @@ export class BoardScene extends Phaser.Scene {
       if (rangeMin > 0 && dist < rangeMin) continue;
       this.spellRangeKeys.add(key);
       this.tileMap.get(key)?.setSpellRange(true);
+    }
+  }
+
+  /**
+   * Charge : surligne toutes les cases atteignables en ligne droite (4 directions)
+   * jusqu'à un obstacle, une autre cible, ou un ennemi (la cible finale est incluse).
+   * La distance traversée détermine le bonus +20% / case.
+   */
+  private showChargeRange(maxRange: number): void {
+    const origin = this.state.character.pos;
+    const directions: GridPos[] = [
+      { x: 0, y: -1 },
+      { x: 1, y: 0 },
+      { x: 0, y: 1 },
+      { x: -1, y: 0 },
+    ];
+
+    for (const dir of directions) {
+      for (let step = 1; step <= maxRange; step++) {
+        const x = origin.x + dir.x * step;
+        const y = origin.y + dir.y * step;
+        if (x < 0 || x >= GRID_COLS || y < 0 || y >= GRID_ROWS) break;
+
+        const key = posKey({ x, y });
+        const tile = this.state.tiles[y][x];
+        if (tile === TileType.Obstacle) break;
+
+        const enemyHere = this.state.enemies.find((e) => posKey(e.pos) === key);
+        if (enemyHere) {
+          // Charge impossible sur ennemi adjacent (distance 1 : aucune case traversée).
+          if (step >= 2) {
+            this.spellRangeKeys.add(key);
+            this.tileMap.get(key)?.setSpellRange(true);
+          }
+          break; // on s'arrête au premier ennemi dans la ligne
+        }
+
+        this.spellRangeKeys.add(key);
+        this.tileMap.get(key)?.setSpellRange(true);
+      }
     }
   }
 
@@ -557,50 +620,7 @@ export class BoardScene extends Phaser.Scene {
       if (!spell) return;
       if (!this.canAffordSpell(spell)) return;
 
-      const enemy = this.state.enemies.find((e) => posKey(e.pos) === key);
-      if (!enemy) return;
-      if (!this.fight.canPlayerAfford(spell.cost)) return;
-
-      this.fight.spendPA(spell.cost);
-
-      const { damage, killed } = computeDamage(
-        this.state.character,
-        enemy,
-        spell,
-        enemy.hp,
-      );
-      enemy.hp -= damage;
-
-      // PS : +1 si on inflige des d\u00e9g\u00e2ts directs (1x / attaque)
-      if (damage > 0) {
-        this.fight.addPS(1, "inflict");
-      }
-
-      this.eventBus.emit({
-        type: "damage",
-        attackerId: "player",
-        targetId: enemy.id,
-        damage,
-        spell: spell.name,
-      });
-
-      const enemySprite = this.enemySprites.get(enemy.id);
-      if (enemySprite) {
-        const screen = gridToScreen(enemy.pos);
-        showDamagePopup(this, screen.x, screen.y, damage);
-        enemySprite.playHitReaction(this);
-      }
-
-      if (killed) {
-        this.eventBus.emit({ type: "death", entityId: enemy.id });
-        this.killEnemy(enemy.id);
-      }
-
-      this.state.actionMode = ActionMode.Move;
-      this.state.activeSpellIndex = null;
-      this.refreshHighlights();
-      this.checkFightEnd();
-      this.emitState();
+      await this.castSpell(spell, pos);
       return;
     }
 
@@ -623,6 +643,341 @@ export class BoardScene extends Phaser.Scene {
 
     this.refreshHighlights();
     this.emitState();
+  }
+
+  /** Applique du self-harm en % des HP actuels au personnage. */
+  private applySelfHarm(percent: number): void {
+    const current = this.state.character.hp;
+    const loss = Math.max(1, Math.floor((current * percent) / 100));
+    this.state.character.hp = Math.max(0, current - loss);
+    this.eventBus.emit({ type: "selfHarm", amount: loss });
+    const playerScreen = gridToScreen(this.state.character.pos);
+    showDamagePopup(this, playerScreen.x, playerScreen.y, loss);
+    this.character.playHitReaction(this);
+  }
+
+  /** Dispatch principal de lancement de sort selon targetMode. */
+  private async castSpell(spell: Spell, pos: GridPos): Promise<void> {
+    const mode = spell.targetMode ?? "enemy";
+
+    if (mode === "self") {
+      await this.castSelfSpell(spell);
+    } else if (mode === "line-charge") {
+      await this.castChargeSpell(spell, pos);
+    } else {
+      await this.castEnemySpell(spell, pos);
+    }
+
+    this.state.actionMode = ActionMode.Move;
+    this.state.activeSpellIndex = null;
+    this.refreshHighlights();
+    this.checkFightEnd();
+    this.emitState();
+  }
+
+  /** Sort ciblant le joueur lui-même (Sacrifice, Surmenage, Frénésie, Résistance Brutale). */
+  private async castSelfSpell(spell: Spell): Promise<void> {
+    this.fight.paySpellCosts(spell);
+    this.fight.consumeUse(spell);
+    this.fight.startCooldown(spell);
+
+    if (spell.selfHarmPercent) {
+      this.applySelfHarm(spell.selfHarmPercent);
+    }
+    if (spell.gainsPm) {
+      this.fight.addPM(spell.gainsPm);
+      this.eventBus.emit({ type: "info", message: `+${spell.gainsPm} PP (${spell.name})` });
+    }
+    if (spell.nextAttackFlat) {
+      this.fight.addNextAttackFlat(spell.nextAttackFlat);
+      this.eventBus.emit({ type: "info", message: `${spell.name} : +${spell.nextAttackFlat} dégâts prochaine attaque` });
+    }
+    if (spell.nextAttackPercent) {
+      this.fight.addNextAttackPercent(spell.nextAttackPercent);
+      this.eventBus.emit({ type: "info", message: `${spell.name} : +${spell.nextAttackPercent}% prochaine attaque` });
+    }
+    if (spell.activatesRage) {
+      this.fight.forceEnraged();
+      this.eventBus.emit({ type: "info", message: `Rage activée immédiatement !` });
+    }
+    if (spell.resistBuffPercent && spell.resistBuffTurns) {
+      this.fight.applyResistBuff(spell.resistBuffPercent, spell.resistBuffTurns);
+      this.eventBus.emit({
+        type: "info",
+        message: `+${spell.resistBuffPercent}% résistances pour ${spell.resistBuffTurns} tour(s)`,
+      });
+    }
+  }
+
+  /** Charge : déplacement en ligne droite puis attaque sur la cible. */
+  private async castChargeSpell(spell: Spell, targetPos: GridPos): Promise<void> {
+    const origin = this.state.character.pos;
+    const enemy = this.state.enemies.find((e) => posKey(e.pos) === posKey(targetPos));
+    if (!enemy) {
+      this.eventBus.emit({ type: "info", message: "Charge : cliquez un ennemi en ligne droite." });
+      return;
+    }
+
+    // Détermine la direction et le nombre de cases traversées (jusqu'à adjacent de la cible).
+    const dx = Math.sign(targetPos.x - origin.x);
+    const dy = Math.sign(targetPos.y - origin.y);
+    if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) {
+      this.eventBus.emit({ type: "info", message: "Charge : cible non alignée en ligne droite." });
+      return;
+    }
+
+    const totalDist = manhattan(origin, targetPos);
+    const traversed = totalDist - 1; // on s'arrête adjacent à la cible
+    if (traversed < 1) {
+      this.eventBus.emit({ type: "info", message: "Charge impossible : cible adjacente." });
+      return;
+    }
+
+    // Construit le path case-par-case et vérifie qu'aucune tile n'est bloquée
+    const path: GridPos[] = [];
+    for (let step = 1; step <= traversed; step++) {
+      const next = { x: origin.x + dx * step, y: origin.y + dy * step };
+      if (this.state.tiles[next.y][next.x] === TileType.Obstacle) {
+        this.eventBus.emit({ type: "info", message: "Charge bloquée par un obstacle." });
+        return;
+      }
+      if (this.state.enemies.some((e) => e.id !== enemy.id && e.pos.x === next.x && e.pos.y === next.y)) {
+        this.eventBus.emit({ type: "info", message: "Charge bloquée par un autre ennemi." });
+        return;
+      }
+      path.push(next);
+    }
+
+    // Paye les coûts
+    this.fight.paySpellCosts(spell);
+    this.fight.consumeUse(spell);
+    this.fight.startCooldown(spell);
+
+    // Fait avancer le sprite le long du chemin
+    await this.character.moveAlongPath(this, path);
+    this.state.character.pos = { ...path[path.length - 1] };
+
+    // Calcule et applique les dégâts avec le bonus distance
+    const distanceBonus = (spell.distanceBonusPercent ?? 0) * traversed;
+    const buffs = this.fight.consumeNextAttackBuffs();
+    const modifiers: AttackModifiers = {
+      ragePercent: this.fight.getRagePercent(),
+      flatBonus: buffs.flat,
+      extraPercentBonus: buffs.percent,
+      distanceBonusPercent: distanceBonus,
+      executionBonus: spell.executionBonus,
+    };
+    this.applyDirectDamage(spell, enemy, modifiers);
+  }
+
+  /** Sort ciblant un ennemi (cas général). */
+  private async castEnemySpell(spell: Spell, pos: GridPos): Promise<void> {
+    const enemy = this.state.enemies.find((e) => posKey(e.pos) === posKey(pos));
+    if (!enemy) return;
+
+    this.fight.paySpellCosts(spell);
+    this.fight.consumeUse(spell);
+    this.fight.startCooldown(spell);
+
+    const buffs = this.fight.consumeNextAttackBuffs();
+    const modifiers: AttackModifiers = {
+      ragePercent: this.fight.getRagePercent(),
+      flatBonus: buffs.flat,
+      extraPercentBonus: buffs.percent,
+      executionBonus: spell.executionBonus,
+    };
+
+    this.applyDirectDamage(spell, enemy, modifiers);
+
+    // Push (Intimidation) — toujours après les dégâts, même si la cible est morte on skip
+    if (spell.pushDistance && enemy.hp > 0) {
+      this.pushEnemy(enemy, this.state.character.pos, spell.pushDistance);
+    }
+
+    // Applique les stacks (Entaille : 3 stacks de Poison)
+    if (spell.applyStacks && enemy.hp > 0) {
+      this.fight.addStacks(enemy.id, spell.applyStacks.element, spell.applyStacks.count);
+      this.eventBus.emit({
+        type: "stacks",
+        targetId: enemy.id,
+        element: spell.applyStacks.element,
+        count: spell.applyStacks.count,
+        action: "apply",
+      });
+    }
+  }
+
+  /**
+   * Applique les dégâts directs d'un sort sur un ennemi, gère PS, notification Rage,
+   * déclenchement des stacks poison (trigger "on-hit"), popup + animation, mort.
+   */
+  private applyDirectDamage(spell: Spell, enemy: EnemyState, modifiers: AttackModifiers): void {
+    const { damage, killed } = computeDamage(
+      this.state.character,
+      enemy,
+      spell,
+      enemy.hp,
+      enemy.maxHp,
+      modifiers,
+    );
+    enemy.hp -= damage;
+
+    // PS : +1 sur dégâts directs (1x / attaque)
+    if (damage > 0 && spell.damageType !== "indirect") {
+      this.fight.addPS(1, "inflict");
+      this.fight.notifyDirectDamageDealt();
+    }
+
+    this.eventBus.emit({
+      type: "damage",
+      attackerId: "player",
+      targetId: enemy.id,
+      damage,
+      spell: spell.name,
+    });
+
+    const enemySprite = this.enemySprites.get(enemy.id);
+    if (enemySprite) {
+      const screen = gridToScreen(enemy.pos);
+      showDamagePopup(this, screen.x, screen.y, damage);
+      enemySprite.playHitReaction(this);
+    }
+
+    // Trigger Poison (terre) : "à chaque hit" — max 1 fois / événement, spec stacks.
+    if (!killed && spell.damageType !== "indirect") {
+      this.triggerPoisonOnHit(enemy);
+    }
+
+    if (enemy.hp <= 0) {
+      this.eventBus.emit({ type: "death", entityId: enemy.id });
+      this.fight.clearStacksFor(enemy.id);
+      this.killEnemy(enemy.id);
+    }
+  }
+
+  /** Déclenche les stacks de Poison sur la cible (on-hit). */
+  private triggerPoisonOnHit(enemy: EnemyState): void {
+    const stacks = this.state.targetStacks[enemy.id]?.terre ?? 0;
+    if (stacks <= 0) return;
+    const consumed = this.fight.consumeStacks(enemy.id, "terre");
+    if (consumed <= 0) return;
+    // Formule poison : 2 dégâts par stack consommé (indirect — ne génère pas de PS).
+    const poisonDmg = Math.max(1, consumed * 2);
+    enemy.hp = Math.max(0, enemy.hp - poisonDmg);
+
+    this.eventBus.emit({
+      type: "damage",
+      attackerId: "player",
+      targetId: enemy.id,
+      damage: poisonDmg,
+      spell: "Poison (Terre)",
+    });
+    this.eventBus.emit({
+      type: "stacks",
+      targetId: enemy.id,
+      element: "terre",
+      count: consumed,
+      action: "tick",
+    });
+
+    const enemySprite = this.enemySprites.get(enemy.id);
+    if (enemySprite) {
+      const screen = gridToScreen(enemy.pos);
+      showDamagePopup(this, screen.x, screen.y - 10 * DPR, poisonDmg);
+    }
+
+    if (enemy.hp <= 0) {
+      this.eventBus.emit({ type: "death", entityId: enemy.id });
+      this.fight.clearStacksFor(enemy.id);
+      this.killEnemy(enemy.id);
+    }
+  }
+
+  /** Pousse un ennemi de N cases dans la direction opposée au joueur. */
+  private pushEnemy(enemy: EnemyState, from: GridPos, distance: number): void {
+    const dx = Math.sign(enemy.pos.x - from.x);
+    const dy = Math.sign(enemy.pos.y - from.y);
+    // Doit être cardinal strict (X ou Y, pas les deux)
+    if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) {
+      this.eventBus.emit({
+        type: "info",
+        message: `${enemy.name} : push annulé (direction non cardinale)`,
+      });
+      return;
+    }
+
+    let finalPos = { ...enemy.pos };
+    let blockedBy: string | null = null;
+    let pushedCases = 0;
+    for (let step = 1; step <= distance; step++) {
+      const next = { x: enemy.pos.x + dx * step, y: enemy.pos.y + dy * step };
+      if (next.x < 0 || next.x >= GRID_COLS || next.y < 0 || next.y >= GRID_ROWS) {
+        blockedBy = "bord";
+        break;
+      }
+      if (this.state.tiles[next.y][next.x] === TileType.Obstacle) {
+        blockedBy = "obstacle";
+        break;
+      }
+      if (this.state.enemies.some((e) => e.id !== enemy.id && e.pos.x === next.x && e.pos.y === next.y)) {
+        blockedBy = "un autre ennemi";
+        break;
+      }
+      if (this.state.character.pos.x === next.x && this.state.character.pos.y === next.y) {
+        blockedBy = "le joueur";
+        break;
+      }
+      finalPos = next;
+      pushedCases = step;
+    }
+
+    if (pushedCases === 0) {
+      this.eventBus.emit({
+        type: "info",
+        message: `${enemy.name} n'a pas pu être poussé (${blockedBy ?? "bloqué"})`,
+      });
+      return;
+    }
+
+    this.eventBus.emit({
+      type: "info",
+      message:
+        pushedCases < distance
+          ? `${enemy.name} poussé de ${pushedCases} case(s) (${blockedBy})`
+          : `${enemy.name} poussé de ${pushedCases} case(s)`,
+    });
+
+    const sprite = this.enemySprites.get(enemy.id);
+
+    // Kill la hit-reaction en cours (shake + flash alpha) AVANT le push :
+    // sinon son onComplete force un setPosition sur l'ancien x/y capturé
+    // au moment du hit, ce qui remet l'ennemi à sa position d'origine et
+    // désynchronise état logique ↔ visuel.
+    if (sprite) {
+      this.tweens.killTweensOf(sprite);
+      const oldScreen = gridToScreen(enemy.pos); // encore l'ancienne position
+      sprite.setPosition(oldScreen.x, oldScreen.y);
+      sprite.alpha = 1;
+      sprite.syncHpBarPosition();
+    }
+
+    enemy.pos = finalPos;
+    if (sprite) {
+      const target = gridToScreen(finalPos);
+      this.tweens.add({
+        targets: sprite,
+        x: target.x,
+        y: target.y,
+        duration: 220,
+        ease: "Sine.easeOut",
+        onUpdate: () => sprite.syncHpBarPosition(),
+        onComplete: () => {
+          sprite.gridPos = { ...finalPos };
+          sprite.setDepth(100 + finalPos.y * 10);
+          sprite.alpha = 1;
+        },
+      });
+    }
   }
 
   // ── Enemy phase ──────────────────────────────────────────
@@ -659,9 +1014,13 @@ export class BoardScene extends Phaser.Scene {
 
         const { damage } = computeDamage(
           enemy,
-          this.state.character,
+          {
+            resistances: this.state.character.resistances,
+            resistBuffPercent: this.state.character.resistBuffPercent,
+          },
           spell,
           this.state.character.hp,
+          this.state.character.maxHp,
         );
         this.state.character.hp -= damage;
 

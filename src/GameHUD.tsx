@@ -1,6 +1,7 @@
 import { useState } from "react";
-import type { GameState } from "./game/core/gameState";
+import type { GameState, Spell } from "./game/core/gameState";
 import { ActionMode } from "./game/core/gameState";
+import type { Element } from "./game/data/elements";
 
 interface GameHUDProps {
   state: GameState | null;
@@ -354,35 +355,56 @@ function HoverTooltip({
 
 function SpellTooltip({
   spell,
+  cooldownRemaining,
+  usesRemaining,
 }: {
-  spell: {
-    name: string;
-    range: number;
-    cost: number;
-    damagePercent: number;
-    rangeMin?: number;
-    element?: string;
-    description?: string;
-  };
+  spell: Spell;
+  cooldownRemaining: number;
+  usesRemaining: number | null;
 }) {
   const rangeMin = spell.rangeMin ?? 1;
-  const rangeText = rangeMin === spell.range ? `${spell.range}` : `${rangeMin}-${spell.range}`;
+  const rangeText =
+    spell.targetMode === "self"
+      ? "soi"
+      : rangeMin === spell.range
+        ? `${spell.range}`
+        : `${rangeMin}-${spell.range}`;
 
   const descLines = (spell.description ?? "").split("\n").filter(Boolean);
-  const headerLine = descLines[0] ?? "";
-  const hasHeaderLine = headerLine.includes("—") && headerLine.includes("|");
-  const bodyLines = hasHeaderLine ? descLines.slice(1) : descLines;
+  const bodyLines = descLines;
 
   const badges = (
     <>
       {spell.element && <ElementBadge element={spell.element} />}
-      <TooltipBadge color="#60a5fa">{spell.cost} PA</TooltipBadge>
+      {spell.cost > 0 && <TooltipBadge color="#60a5fa">{spell.cost} PA</TooltipBadge>}
+      {(spell.pfCost ?? 0) > 0 && <TooltipBadge color="#c084fc">{spell.pfCost} PF</TooltipBadge>}
+      {(spell.psCost ?? 0) > 0 && (
+        <TooltipBadge color="#f87171" background="#ef444418" borderColor="#ef444444">
+          {spell.psCost} PS
+        </TooltipBadge>
+      )}
+      {(spell.ppCost ?? 0) > 0 && <TooltipBadge color="#facc15">{spell.ppCost} PP</TooltipBadge>}
       <TooltipBadge color="#aaa" background="#ffffff0a" borderColor="#ffffff18">
         {rangeText} PO
       </TooltipBadge>
       {spell.damagePercent > 0 && (
         <TooltipBadge color="#f87171" background="#ef444418" borderColor="#ef444444">
           {spell.damagePercent}%
+        </TooltipBadge>
+      )}
+      {(spell.cooldown ?? 0) > 0 && (
+        <TooltipBadge color="#94a3b8" background="#64748b18" borderColor="#64748b44">
+          CD {spell.cooldown}
+        </TooltipBadge>
+      )}
+      {cooldownRemaining > 0 && (
+        <TooltipBadge color="#f59e0b" background="#f59e0b18" borderColor="#f59e0b44">
+          en CD : {cooldownRemaining}t
+        </TooltipBadge>
+      )}
+      {usesRemaining != null && (
+        <TooltipBadge color="#34d399" background="#34d39918" borderColor="#34d39944">
+          {usesRemaining}/{spell.usesPerTurn} utilisation(s)
         </TooltipBadge>
       )}
     </>
@@ -393,29 +415,53 @@ function SpellTooltip({
 
 /* ── Spell slot ──────────────────────────────────── */
 
+const ELEMENT_COLOR_MAP: Record<Element, string> = {
+  feu: "#fb923c",
+  eau: "#60a5fa",
+  vent: "#a3e635",
+  terre: "#a16207",
+  neutre: "#a1a1aa",
+};
+
+function CostChip({ value, color }: { value: number; color: string }) {
+  return (
+    <span
+      style={{
+        fontSize: 8,
+        fontWeight: 800,
+        color,
+        fontFamily: "monospace",
+        padding: "1px 3px",
+        borderRadius: 2,
+        background: `${color}18`,
+        lineHeight: 1,
+      }}
+    >
+      {value}
+    </span>
+  );
+}
+
 function SpellSlot({
   spell,
   isActive,
   canAfford,
   disabled,
+  cooldownRemaining,
+  usesRemaining,
   onSelect,
 }: {
-  spell: { name: string; range: number; cost: number; damagePercent: number; rangeMin?: number; element?: string; description?: string };
+  spell: Spell;
   isActive: boolean;
   canAfford: boolean;
   disabled: boolean;
+  cooldownRemaining: number;
+  usesRemaining: number | null;
   onSelect: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
-
-  const elementColor: Record<string, string> = {
-    feu: "#fb923c",
-    eau: "#60a5fa",
-    vent: "#a3e635",
-    terre: "#a16207",
-    neutre: "#a1a1aa",
-  };
-  const accent = spell.element ? elementColor[spell.element] ?? "#2a2a3e" : "#2a2a3e";
+  const accent = ELEMENT_COLOR_MAP[spell.element] ?? "#2a2a3e";
+  const onCooldown = cooldownRemaining > 0;
 
   return (
     <div
@@ -423,7 +469,13 @@ function SpellSlot({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      {hovered && <SpellTooltip spell={spell} />}
+      {hovered && (
+        <SpellTooltip
+          spell={spell}
+          cooldownRemaining={cooldownRemaining}
+          usesRemaining={usesRemaining}
+        />
+      )}
       <button
         onClick={onSelect}
         disabled={disabled}
@@ -459,32 +511,166 @@ function SpellSlot({
         <span style={{ fontSize: 18, fontWeight: 800, lineHeight: 1 }}>
           {spell.name.charAt(0)}
         </span>
-        <span style={{ fontSize: 8, opacity: 0.5, lineHeight: 1 }}>
-          {spell.range}PO
-        </span>
 
+        {/* Coûts secondaires affichés en bas */}
+        <div style={{ display: "flex", gap: 2, marginTop: 1 }}>
+          {(spell.pfCost ?? 0) > 0 && <CostChip value={spell.pfCost!} color="#c084fc" />}
+          {(spell.psCost ?? 0) > 0 && <CostChip value={spell.psCost!} color="#f87171" />}
+          {(spell.ppCost ?? 0) > 0 && <CostChip value={spell.ppCost!} color="#facc15" />}
+        </div>
+
+        {/* Badge coût PA principal */}
+        {spell.cost > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              top: -6,
+              right: -6,
+              minWidth: 16,
+              height: 16,
+              borderRadius: 3,
+              background: canAfford ? "#2563eb" : "#333",
+              color: canAfford ? "#fff" : "#666",
+              fontSize: 10,
+              fontWeight: 800,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 3px",
+              border: "2px solid #0c0c14",
+            }}
+          >
+            {spell.cost}
+          </div>
+        )}
+
+        {/* Overlay cooldown */}
+        {onCooldown && (
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(10, 10, 14, 0.75)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#f59e0b",
+              fontSize: 18,
+              fontWeight: 800,
+              borderRadius: 4,
+              fontFamily: "monospace",
+            }}
+          >
+            {cooldownRemaining}
+          </div>
+        )}
+      </button>
+    </div>
+  );
+}
+
+/* ── Rage indicator (Barbare passif) ───────────────── */
+
+function RageIndicator({ state }: { state: "neutral" | "enraged" | "punished" }) {
+  const [hovered, setHovered] = useState(false);
+  const isNeutral = state === "neutral";
+  const isEnraged = state === "enraged";
+  const color = isEnraged ? "#ef4444" : isNeutral ? "#64748b" : "#94a3b8";
+  const bg = isEnraged ? "#ef444422" : isNeutral ? "#64748b18" : "#94a3b822";
+  const label = isEnraged ? "ENRAGÉ +20%" : isNeutral ? "RAGE NEUTRE" : "PUNI −20%";
+  const icon = isEnraged ? "🔥" : isNeutral ? "⚔️" : "💤";
+
+  const tooltipLines = isEnraged
+    ? [
+        "Vous avez infligé des dégâts au tour précédent.",
+        "Toutes vos attaques de ce tour : +20% dégâts finaux.",
+        "Continuez à frapper pour rester Enragé au tour suivant.",
+        "Si aucun dégât n'est infligé ce tour, vous serez Puni (−20%) au tour suivant.",
+      ]
+    : isNeutral
+      ? [
+          "Infligez des dégâts directs ce tour pour devenir Enragé au tour suivant (+20%).",
+          "DoT / stacks ne comptent pas.",
+        ]
+      : [
+          "Vous étiez Enragé mais n'avez infligé aucun dégât direct.",
+          "Conséquence : −20% dégâts finaux ce tour.",
+          "Infligez des dégâts ce tour pour redevenir Enragé.",
+        ];
+
+  return (
+    <div
+      style={{ position: "relative" }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      {hovered && (
+        <HoverTooltip
+          title={label}
+          badges={<TooltipBadge color={color}>Passif Barbare — Rage</TooltipBadge>}
+          description={tooltipLines}
+        />
+      )}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          padding: "3px 8px",
+          borderRadius: 4,
+          background: bg,
+          border: `1px solid ${color}55`,
+          fontFamily: "monospace",
+          fontSize: 11,
+          fontWeight: 800,
+          color,
+          boxShadow: isEnraged ? `0 0 10px ${color}55` : "none",
+          cursor: "help",
+        }}
+      >
+        <span style={{ fontSize: 12 }}>{icon}</span>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function NextAttackBuffs({
+  flat,
+  percent,
+  resistPct,
+  resistTurns,
+}: {
+  flat: number;
+  percent: number;
+  resistPct: number;
+  resistTurns: number;
+}) {
+  const items: { color: string; label: string; key: string }[] = [];
+  if (flat > 0) items.push({ key: "flat", color: "#f97316", label: `+${flat} plat` });
+  if (percent > 0) items.push({ key: "pct", color: "#fb7185", label: `+${percent}%` });
+  if (resistPct > 0 && resistTurns > 0)
+    items.push({ key: "res", color: "#38bdf8", label: `+${resistPct}% rés (${resistTurns}t)` });
+  if (items.length === 0) return null;
+  return (
+    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+      {items.map((it) => (
         <div
+          key={it.key}
           style={{
-            position: "absolute",
-            top: -6,
-            right: -6,
-            minWidth: 16,
-            height: 16,
-            borderRadius: 3,
-            background: canAfford ? "#2563eb" : "#333",
-            color: canAfford ? "#fff" : "#666",
             fontSize: 10,
-            fontWeight: 800,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "0 3px",
-            border: "2px solid #0c0c14",
+            fontWeight: 700,
+            fontFamily: "monospace",
+            color: it.color,
+            padding: "2px 6px",
+            borderRadius: 3,
+            background: `${it.color}18`,
+            border: `1px solid ${it.color}44`,
           }}
         >
-          {spell.cost}
+          {it.label}
         </div>
-      </button>
+      ))}
     </div>
   );
 }
@@ -496,6 +682,21 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
 
   const { character } = state;
   const isPlayerTurn = state.currentTurn === "player";
+
+  const canCastSpell = (spell: Spell): boolean => {
+    if (state.remainingPA < spell.cost) return false;
+    if ((spell.pfCost ?? 0) > state.remainingPF) return false;
+    if ((spell.psCost ?? 0) > state.remainingPS) return false;
+    if ((spell.ppCost ?? 0) > state.remainingPM) return false;
+    if (spell.id) {
+      if ((character.cooldowns[spell.id] ?? 0) > 0) return false;
+      if (spell.usesPerTurn != null) {
+        const uses = character.spellUsesRemaining[spell.id] ?? 0;
+        if (uses <= 0) return false;
+      }
+    }
+    return true;
+  };
 
   return (
     <div
@@ -526,7 +727,16 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
       >
         {/* ── Stats block ── */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-          <HPBar value={character.hp} max={character.maxHp} />
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <HPBar value={character.hp} max={character.maxHp} />
+            {character.hasRagePassive && <RageIndicator state={character.rageState} />}
+          </div>
+          <NextAttackBuffs
+            flat={character.nextAttackFlat}
+            percent={character.nextAttackPercent}
+            resistPct={character.resistBuffPercent}
+            resistTurns={character.resistBuffTurns}
+          />
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
             <PointCounter
               icon={<StarIcon />}
@@ -617,7 +827,12 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
             const isActive =
               state.actionMode === ActionMode.Targeting &&
               state.activeSpellIndex === i;
-            const canAfford = state.remainingPA >= spell.cost;
+            const canAfford = canCastSpell(spell);
+            const cooldownRemaining = spell.id ? (character.cooldowns[spell.id] ?? 0) : 0;
+            const usesRemaining =
+              spell.id && spell.usesPerTurn != null
+                ? (character.spellUsesRemaining[spell.id] ?? spell.usesPerTurn)
+                : null;
             const disabled = !isPlayerTurn || !canAfford;
 
             return (
@@ -627,6 +842,8 @@ export function GameHUD({ state, onSelectSpell, onEndTurn }: GameHUDProps) {
                 isActive={isActive}
                 canAfford={canAfford}
                 disabled={disabled}
+                cooldownRemaining={cooldownRemaining}
+                usesRemaining={usesRemaining}
                 onSelect={() => onSelectSpell(i)}
               />
             );
@@ -716,6 +933,7 @@ const BEHAVIOR_LABEL: Record<string, { label: string; color: string }> = {
   ranged: { label: "Distance", color: "#38bdf8" },
   tank: { label: "Tank", color: "#a3e635" },
   boss: { label: "Boss", color: "#f59e0b" },
+  dummy: { label: "Inerte", color: "#9a6ad0" },
 };
 
 export function EnemyTooltip({ state }: { state: GameState | null }) {
@@ -836,6 +1054,34 @@ export function EnemyTooltip({ state }: { state: GameState | null }) {
             <StatPill label="PP" value={enemy.moveRange} color="#facc15" />
             <StatPill label="PA" value={enemy.ap} color="#a78bfa" />
           </div>
+
+          {(() => {
+            const stacks = state.targetStacks?.[enemy.id];
+            if (!stacks) return null;
+            const entries = Object.entries(stacks).filter(([, n]) => (n ?? 0) > 0);
+            if (entries.length === 0) return null;
+            return (
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 2 }}>
+                {entries.map(([el, count]) => (
+                  <span
+                    key={el}
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      fontFamily: "monospace",
+                      color: ELEMENT_META[el]?.color ?? "#aaa",
+                      padding: "2px 6px",
+                      background: `${ELEMENT_META[el]?.color ?? "#aaa"}18`,
+                      border: `1px solid ${ELEMENT_META[el]?.color ?? "#aaa"}44`,
+                      borderRadius: 3,
+                    }}
+                  >
+                    {ELEMENT_META[el]?.icon ?? ""} {el} ×{count}
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
 
           {enemy.spells.length > 0 && (
             <div style={{ display: "flex", gap: 4, flexWrap: "wrap", marginTop: 2 }}>

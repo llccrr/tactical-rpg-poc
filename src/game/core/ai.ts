@@ -20,6 +20,8 @@ export function decideEnemyMove(
   enemy: EnemyState,
   state: GameState,
 ): EnemyMoveDecision | null {
+  if (enemy.behavior === "dummy") return null;
+
   const blocked = getBlockedSet(state);
   blocked.delete(posKey(enemy.pos));
   blocked.add(posKey(state.character.pos));
@@ -177,6 +179,8 @@ export function decideEnemyAttack(
   enemy: EnemyState,
   playerPos: GridPos,
 ): Spell | null {
+  if (enemy.behavior === "dummy") return null;
+
   const dist = manhattan(enemy.pos, playerPos);
   const inRange = enemy.spells.filter((s) => dist <= s.range);
   if (inRange.length === 0) return null;

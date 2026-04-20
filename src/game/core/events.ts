@@ -6,7 +6,9 @@ export type CombatEvent =
   | { type: "turnStart"; entityId: string; turnNumber: number }
   | { type: "turnEnd"; entityId: string }
   | { type: "fightEnd"; result: FightResult }
-  | { type: "info"; message: string };
+  | { type: "info"; message: string }
+  | { type: "selfHarm"; amount: number }
+  | { type: "stacks"; targetId: string; element: string; count: number; action: "apply" | "tick" };
 
 export type CombatEventListener = (event: CombatEvent) => void;
 

@@ -161,6 +161,13 @@ export default function App() {
     const nextRoom = run.currentRoom + 1;
 
     if (nextRoom >= dungeon.rooms.length) {
+      if (dungeon.isTraining) {
+        setDungeonRun(null);
+        setDungeonEndData(null);
+        setGameState(null);
+        setScreen("hub");
+        return;
+      }
       const lootedResourceId = rollLoot(dungeon.lootTable);
       setPlayer((prev) => addResource(prev, lootedResourceId));
       setCompletedDungeons((prev) =>

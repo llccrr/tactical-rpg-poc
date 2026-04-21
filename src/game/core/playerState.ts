@@ -82,6 +82,41 @@ export function getEquipmentBonuses(state: PlayerState): StatBonuses {
         if (add != null) resistances[el] = (resistances[el] ?? 0) + add;
       }
     }
+    // L'arme équipée fixe les dégâts d'arme ; on garde le max si plusieurs (un seul slot
+    // arme existe de toute façon).
+    if (item.bonuses.weaponDamage != null) {
+      bonuses.weaponDamage = Math.max(bonuses.weaponDamage ?? 0, item.bonuses.weaponDamage);
+    }
+    if (item.bonuses.bonusSpells) {
+      bonuses.bonusSpells = [...(bonuses.bonusSpells ?? []), ...item.bonuses.bonusSpells];
+    }
+    if (item.bonuses.lifestealPct != null) {
+      bonuses.lifestealPct = (bonuses.lifestealPct ?? 0) + item.bonuses.lifestealPct;
+    }
+    if (item.bonuses.burnOnHitStacks != null) {
+      bonuses.burnOnHitStacks = (bonuses.burnOnHitStacks ?? 0) + item.bonuses.burnOnHitStacks;
+    }
+    if (item.bonuses.flatDamageReduction != null) {
+      bonuses.flatDamageReduction = (bonuses.flatDamageReduction ?? 0) + item.bonuses.flatDamageReduction;
+    }
+    if (item.bonuses.flatResistancePct != null) {
+      bonuses.flatResistancePct = (bonuses.flatResistancePct ?? 0) + item.bonuses.flatResistancePct;
+    }
+    if (item.bonuses.hpMaxPercentBonus != null) {
+      bonuses.hpMaxPercentBonus = (bonuses.hpMaxPercentBonus ?? 0) + item.bonuses.hpMaxPercentBonus;
+    }
+    if (item.bonuses.bonusMoveRange != null) {
+      bonuses.bonusMoveRange = (bonuses.bonusMoveRange ?? 0) + item.bonuses.bonusMoveRange;
+    }
+    if (item.bonuses.psMaxBonus != null) {
+      bonuses.psMaxBonus = (bonuses.psMaxBonus ?? 0) + item.bonuses.psMaxBonus;
+    }
+    if (item.bonuses.psToPfCostOverride != null) {
+      bonuses.psToPfCostOverride = item.bonuses.psToPfCostOverride;
+    }
+    if (item.bonuses.firstDashesDiscount != null) {
+      bonuses.firstDashesDiscount = (bonuses.firstDashesDiscount ?? 0) + item.bonuses.firstDashesDiscount;
+    }
   }
 
   let hasResistance = false;

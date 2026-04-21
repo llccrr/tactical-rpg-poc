@@ -188,13 +188,50 @@ export class FightController {
     this.state.character.nextAttackPercent += pct;
   }
 
+  /** Ajoute de la pénétration de résistance sur la prochaine attaque (Tête Minerai T3+). */
+  addNextAttackPenetration(pct: number): void {
+    this.state.character.nextAttackPenetrationPct += pct;
+  }
+
+  /** Ajoute un bonus de lifesteal sur la prochaine attaque (Tête Cuir). */
+  addNextAttackLifestealBonus(pct: number): void {
+    this.state.character.nextAttackLifestealBonusPct += pct;
+  }
+
+  /** PM retirés à la cible sur la prochaine attaque directe (Tête Cuir T3+). */
+  addNextAttackPmDrain(n: number): void {
+    this.state.character.nextAttackPmDrain += n;
+  }
+
+  /** Stacks à appliquer sur la cible de la prochaine attaque (Tête Bois — Sang). */
+  setNextAttackApplyStacks(
+    stacks: { element: import("../data/elements").Element; count: number } | null,
+  ): void {
+    this.state.character.nextAttackApplyStacks = stacks;
+  }
+
   /** Consomme les buffs temporaires et retourne leurs valeurs. */
-  consumeNextAttackBuffs(): { flat: number; percent: number } {
+  consumeNextAttackBuffs(): {
+    flat: number;
+    percent: number;
+    penetration: number;
+    lifestealBonus: number;
+    pmDrain: number;
+    applyStacks: { element: import("../data/elements").Element; count: number } | null;
+  } {
     const flat = this.state.character.nextAttackFlat;
     const percent = this.state.character.nextAttackPercent;
+    const penetration = this.state.character.nextAttackPenetrationPct;
+    const lifestealBonus = this.state.character.nextAttackLifestealBonusPct;
+    const pmDrain = this.state.character.nextAttackPmDrain;
+    const applyStacks = this.state.character.nextAttackApplyStacks;
     this.state.character.nextAttackFlat = 0;
     this.state.character.nextAttackPercent = 0;
-    return { flat, percent };
+    this.state.character.nextAttackPenetrationPct = 0;
+    this.state.character.nextAttackLifestealBonusPct = 0;
+    this.state.character.nextAttackPmDrain = 0;
+    this.state.character.nextAttackApplyStacks = null;
+    return { flat, percent, penetration, lifestealBonus, pmDrain, applyStacks };
   }
 
   /** Active le buff de résistance tous éléments pendant X tours. */
@@ -238,11 +275,21 @@ export class FightController {
     pa: { cost: 10, gain: 1, maxPerTurn: 1 },
   } as const;
 
+  /** Retourne le coût effectif d'une conversion (prend en compte Torse Gemme T5). */
+  private psCost(type: "pm" | "pf" | "pa"): number {
+    const baseCost = FightController.PS_CONVERSION[type].cost;
+    if (type === "pf" && this.state.character.psToPfCostOverride != null) {
+      return this.state.character.psToPfCostOverride;
+    }
+    return baseCost;
+  }
+
   /** Whether a given PS conversion is currently possible. */
   canConvertPS(type: "pm" | "pf" | "pa"): boolean {
     if (!this.isPlayerTurn()) return false;
     const cfg = FightController.PS_CONVERSION[type];
-    if (this.state.remainingPS < cfg.cost) return false;
+    const cost = this.psCost(type);
+    if (this.state.remainingPS < cost) return false;
     if (this.state.psConversions[type] >= cfg.maxPerTurn) return false;
     return true;
   }
@@ -254,8 +301,9 @@ export class FightController {
   convertPS(type: "pm" | "pf" | "pa"): boolean {
     if (!this.canConvertPS(type)) return false;
     const cfg = FightController.PS_CONVERSION[type];
+    const cost = this.psCost(type);
 
-    this.state.remainingPS -= cfg.cost;
+    this.state.remainingPS -= cost;
     this.state.psConversions[type] += cfg.gain;
 
     if (type === "pm") this.state.remainingPM += cfg.gain;
@@ -265,7 +313,7 @@ export class FightController {
     const labels = { pm: "PM", pf: "PF", pa: "PA" };
     this.eventBus.emit({
       type: "info",
-      message: `Conversion : −${cfg.cost} PS → +${cfg.gain} ${labels[type]}`,
+      message: `Conversion : −${cost} PS → +${cfg.gain} ${labels[type]}`,
     });
 
     return true;
@@ -314,6 +362,9 @@ export class FightController {
 
     // Reset des conversions PS par tour
     this.state.psConversions = { pm: 0, pf: 0, pa: 0 };
+
+    // Reset du compteur de dashs discountés (Cuir Bottes)
+    this.state.character.dashesDiscountedThisTurn = 0;
 
     // Décrément des cooldowns
     for (const id of Object.keys(this.state.character.cooldowns)) {

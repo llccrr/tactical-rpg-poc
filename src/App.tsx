@@ -278,7 +278,7 @@ export default function App() {
           onCheat={() => setPlayer((prev) => {
             let next = prev;
             for (const r of RESOURCES) {
-              next = addResource(next, r.id, 3);
+              next = addResource(next, r.id, 10);
             }
             return next;
           })}

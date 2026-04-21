@@ -4,6 +4,8 @@ import { WEAPON_BASE_DAMAGE, clampResistance, RESISTANCE_CAP, type Resistances }
 /** Attacker side inputs for damage computation. */
 export interface AttackerStats {
   attack: number;
+  /** Dégâts de base d'arme de l'attaquant (défaut WEAPON_BASE_DAMAGE = 10). */
+  weaponDamage?: number;
 }
 
 /** Defender side inputs for damage computation. */
@@ -11,6 +13,10 @@ export interface DefenderStats {
   resistances: Resistances;
   /** Bonus temporaire (ex : Résistance Brutale du Barbare). */
   resistBuffPercent?: number;
+  /** Bonus plat de résistance sur tous les éléments (Torse Cuir). 0..1. */
+  flatResistancePct?: number;
+  /** Réduction plate des dégâts directs reçus (Torse Minerai). */
+  flatDamageReduction?: number;
 }
 
 /** Buffs / modifiers temporaires de l'attaquant, utilisés sur une attaque précise. */
@@ -25,6 +31,8 @@ export interface AttackModifiers {
   distanceBonusPercent?: number;
   /** Exécution : +1% par 1% de HP manquant sur la cible. */
   executionBonus?: boolean;
+  /** % de résistance ignorée (Tête Minerai). */
+  resistancePenetrationPct?: number;
 }
 
 export interface DamageResult {
@@ -49,8 +57,9 @@ export function computeDamage(
   defenderMaxHp: number = defenderHp,
   modifiers: AttackModifiers = {},
 ): DamageResult {
-  // Dégât de base (% de l'arme)
-  const weapon = (WEAPON_BASE_DAMAGE * spell.damagePercent) / 100;
+  // Dégât de base (% de l'arme équipée, défaut 10)
+  const weaponDamage = attacker.weaponDamage ?? WEAPON_BASE_DAMAGE;
+  const weapon = (weaponDamage * spell.damagePercent) / 100;
 
   // Étape 4 : buffs additifs en % (rage + frénésie + distance + exécution)
   let percentMultiplier = 1;
@@ -76,11 +85,19 @@ export function computeDamage(
   // Étape 5 : résistance élémentaire de la cible, capée à 70%
   const baseResist = defender.resistances[spell.element] ?? 0;
   const buffResist = defender.resistBuffPercent ? defender.resistBuffPercent / 100 : 0;
-  const totalResist = Math.min(RESISTANCE_CAP, clampResistance(baseResist) + buffResist);
+  const flatResist = defender.flatResistancePct ?? 0;
+  let totalResist = Math.min(RESISTANCE_CAP, clampResistance(baseResist) + buffResist + flatResist);
+  // Pénétration de résistance (Tête Minerai T3+) — réduit la résistance effective.
+  const penetration = (modifiers.resistancePenetrationPct ?? 0) / 100;
+  if (penetration > 0) totalResist = Math.max(0, totalResist - penetration);
   const afterResist = buffed * (1 - totalResist);
 
+  // Étape 5bis : réduction plate des dégâts directs (Torse Minerai).
+  const flatDR = defender.flatDamageReduction ?? 0;
+  const afterDR = spell.damageType === "direct" ? afterResist - flatDR : afterResist;
+
   // Étape 6 : minimum 1
-  const damage = Math.max(1, Math.floor(afterResist));
+  const damage = Math.max(1, Math.floor(afterDR));
 
   return { damage, killed: defenderHp - damage <= 0 };
 }

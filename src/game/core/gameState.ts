@@ -7,7 +7,7 @@ import { makeEnemy } from "../data/enemies";
 import type { RoomDef } from "../data/dungeons";
 import type { StatBonuses } from "../data/items";
 import type { Element, Resistances } from "../data/elements";
-import { makeResistances } from "../data/elements";
+import { makeResistances, WEAPON_BASE_DAMAGE } from "../data/elements";
 
 export type RageState = "neutral" | "enraged" | "punished";
 
@@ -81,6 +81,29 @@ export interface Spell {
 
   /** Applique des stacks \u00e9l\u00e9mentaires sur la cible touch\u00e9e (Entaille). */
   applyStacks?: { element: Element; count: number };
+
+  /** Distance de pull (cibles adjacentes ramenées vers l'attaquant). */
+  pullDistance?: number;
+  /** Rayon d'effet en cases autour de la cible (sort zone). */
+  zoneRadius?: number;
+  /** Stacks appliqués à tous les ennemis dans la zone. */
+  zoneApplyStacks?: { element: Element; count: number };
+  /** Choix d'élément (si plusieurs possibles) — simplifié : le premier est utilisé. */
+  elementChoices?: Element[];
+
+  /** % de résistance ignorée sur la prochaine attaque (buff self). */
+  nextAttackPenetrationPct?: number;
+  /** +N % de lifesteal sur la prochaine attaque (buff self, Tête Cuir). */
+  nextAttackLifestealBonusPct?: number;
+  /** PM retirés à la cible touchée (debuff enemy, Tête Cuir T3+). */
+  targetPmDrain?: number;
+  /** Régénération auto-infligée en % des HP max (sort Torse Bois). */
+  healSelfPercent?: number;
+  /** Bonus conditionnel sur prochaine attaque si cible adjacente à bord/obstacle (Tête Bois).
+   *  ⚠ Actuellement descriptif uniquement : le bonus s'applique inconditionnellement. */
+  requiresTargetNearEdgeOrObstacle?: boolean;
+  /** Stacks appliqués sur la cible de la PROCHAINE attaque directe (Tête Bois : Sang). */
+  grantsNextAttackApplyStacks?: { element: Element; count: number };
 }
 
 export interface CharacterState {
@@ -88,6 +111,30 @@ export interface CharacterState {
   hp: number;
   maxHp: number;
   attack: number;
+  /** Dégâts de base de l'arme équipée (défaut 10, écrasé par l'item arme). */
+  weaponDamage: number;
+  /** Lifesteal % appliqué sur les dégâts directs (arme Cuir). 0 = aucun. */
+  lifestealPct: number;
+  /** Nb de stacks Burn appliqués à chaque attaque directe (arme Gemme). 0 = aucun. */
+  burnOnHitStacks: number;
+  /** Réduction plate des dégâts directs subis (Torse Minerai). */
+  flatDamageReduction: number;
+  /** Bonus plat de résistance tous-éléments (Torse Cuir passif). 0..1. */
+  flatResistancePct: number;
+  /** Override du coût PS→PF (défaut 5, Torse Gemme T5 = 4). */
+  psToPfCostOverride?: number;
+  /** Nombre de dashs (mouvements entamés) bénéficiant d'une remise -1 PM par tour (Cuir Bottes). */
+  firstDashesDiscount: number;
+  /** Compteur de dashs discountés déjà utilisés ce tour. */
+  dashesDiscountedThisTurn: number;
+  /** % de résistance ignorée sur la prochaine attaque (buff temporaire). */
+  nextAttackPenetrationPct: number;
+  /** Bonus de lifesteal % sur la prochaine attaque (buff temporaire). */
+  nextAttackLifestealBonusPct: number;
+  /** PM retirés à la cible sur la prochaine attaque directe (Tête Cuir T3+). */
+  nextAttackPmDrain: number;
+  /** Stacks appliqués sur la cible de la prochaine attaque directe (Tête Bois : Sang). */
+  nextAttackApplyStacks: { element: Element; count: number } | null;
   /** R\u00e9sistances par \u00e9l\u00e9ment (0..0.7). Appliqu\u00e9es en \u00e9tape 5 du calcul. */
   resistances: Resistances;
   /** PM gained at the start of each player turn (spec : 4) */
@@ -206,7 +253,9 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig, bon
     tiles[obs.y][obs.x] = TileType.Obstacle;
   }
 
-  const maxHp = classDef.baseHp + (bonuses?.hp ?? 0);
+  const baseHp = classDef.baseHp + (bonuses?.hp ?? 0);
+  const hpMaxPct = bonuses?.hpMaxPercentBonus ?? 0;
+  const maxHp = Math.floor(baseHp * (1 + hpMaxPct / 100));
   const startHp = roomConfig?.playerHp ?? maxHp;
 
   const enemies = roomConfig
@@ -217,7 +266,8 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig, bon
         makeEnemy("slime", { x: 8, y: 7 }, "2"),
       ];
 
-  const spells = classDef.spells.map((s) => ({ ...s }));
+  const bonusSpells = bonuses?.bonusSpells ?? [];
+  const spells = [...classDef.spells, ...bonusSpells].map((s) => ({ ...s }));
   const spellUsesRemaining: Record<string, number> = {};
   for (const s of spells) {
     if (s.id && s.usesPerTurn != null) {
@@ -232,14 +282,26 @@ export function createInitialState(classId: string, roomConfig?: RoomConfig, bon
       hp: startHp,
       maxHp,
       attack: classDef.baseAttack + (bonuses?.attack ?? 0),
+      weaponDamage: bonuses?.weaponDamage ?? WEAPON_BASE_DAMAGE,
+      lifestealPct: bonuses?.lifestealPct ?? 0,
+      burnOnHitStacks: bonuses?.burnOnHitStacks ?? 0,
+      flatDamageReduction: bonuses?.flatDamageReduction ?? 0,
+      flatResistancePct: bonuses?.flatResistancePct ?? 0,
+      psToPfCostOverride: bonuses?.psToPfCostOverride,
+      firstDashesDiscount: bonuses?.firstDashesDiscount ?? 0,
+      dashesDiscountedThisTurn: 0,
+      nextAttackPenetrationPct: 0,
+      nextAttackLifestealBonusPct: 0,
+      nextAttackPmDrain: 0,
+      nextAttackApplyStacks: null,
       resistances: makeResistances({
         ...classDef.resistances,
         ...bonuses?.resistances,
       }),
-      moveRange: classDef.basePm,
+      moveRange: classDef.basePm + (bonuses?.bonusMoveRange ?? 0),
       ap: classDef.basePa,
       pf: classDef.basePf,
-      psMax: classDef.basePsMax,
+      psMax: classDef.basePsMax + (bonuses?.psMaxBonus ?? 0),
       selected: true,
       spells,
       hasRagePassive: classDef.hasRagePassive ?? false,

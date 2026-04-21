@@ -645,7 +645,22 @@ export class BoardScene extends Phaser.Scene {
 
     await this.character.moveAlongPath(this, path);
 
-    this.fight.spendPM(path.length);
+    // Cuir Bottes : les N premiers "dashs" du tour coûtent 1 PM de moins.
+    let cost = path.length;
+    const discountCap = this.state.character.firstDashesDiscount;
+    if (
+      discountCap > 0 &&
+      this.state.character.dashesDiscountedThisTurn < discountCap &&
+      cost > 1
+    ) {
+      cost -= 1;
+      this.state.character.dashesDiscountedThisTurn += 1;
+      this.eventBus.emit({
+        type: "info",
+        message: `Cuir Bottes : déplacement -1 PM (${this.state.character.dashesDiscountedThisTurn}/${discountCap})`,
+      });
+    }
+    this.fight.spendPM(cost);
     this.state.character.pos = { ...pos };
 
     this.refreshHighlights();
@@ -714,6 +729,80 @@ export class BoardScene extends Phaser.Scene {
         message: `+${spell.resistBuffPercent}% résistances pour ${spell.resistBuffTurns} tour(s)`,
       });
     }
+    if (spell.nextAttackPenetrationPct) {
+      this.fight.addNextAttackPenetration(spell.nextAttackPenetrationPct);
+      this.eventBus.emit({
+        type: "info",
+        message: `${spell.name} : prochaine attaque ignore ${spell.nextAttackPenetrationPct}% résistances`,
+      });
+    }
+    if (spell.nextAttackLifestealBonusPct) {
+      this.fight.addNextAttackLifestealBonus(spell.nextAttackLifestealBonusPct);
+      this.eventBus.emit({
+        type: "info",
+        message: `${spell.name} : +${spell.nextAttackLifestealBonusPct}% lifesteal prochaine attaque`,
+      });
+    }
+    if (spell.targetPmDrain) {
+      this.fight.addNextAttackPmDrain(spell.targetPmDrain);
+      this.eventBus.emit({
+        type: "info",
+        message: `${spell.name} : -${spell.targetPmDrain} PM à la cible de la prochaine attaque`,
+      });
+    }
+    if (spell.grantsNextAttackApplyStacks) {
+      this.fight.setNextAttackApplyStacks(spell.grantsNextAttackApplyStacks);
+      const s = spell.grantsNextAttackApplyStacks;
+      this.eventBus.emit({
+        type: "info",
+        message: `${spell.name} : prochaine attaque applique ${s.count} stack${s.count > 1 ? "s" : ""} ${s.element}`,
+      });
+    }
+    if (spell.healSelfPercent) {
+      const heal = Math.max(1, Math.floor((this.state.character.maxHp * spell.healSelfPercent) / 100));
+      const before = this.state.character.hp;
+      const after = Math.min(this.state.character.maxHp, before + heal);
+      const gained = after - before;
+      this.state.character.hp = after;
+      if (gained > 0) {
+        this.eventBus.emit({ type: "info", message: `${spell.name} : +${gained} PV` });
+        const screen = gridToScreen(this.state.character.pos);
+        showDamagePopup(this, screen.x, screen.y - 10 * DPR, -gained);
+      }
+    }
+    // Sort zone self-cast (Gemme Bottes T3+) : hit tous les ennemis à zoneRadius cases.
+    if (spell.zoneRadius && spell.zoneRadius > 0) {
+      this.castZoneAroundPlayer(spell);
+    }
+  }
+
+  /** Applique un sort zone centré sur le joueur : hit + stacks tous les ennemis. */
+  private castZoneAroundPlayer(spell: Spell): void {
+    const origin = this.state.character.pos;
+    const radius = spell.zoneRadius ?? 0;
+    const buffs = this.fight.consumeNextAttackBuffs();
+    const modifiers: AttackModifiers = {
+      ragePercent: this.fight.getRagePercent(),
+      flatBonus: buffs.flat,
+      extraPercentBonus: buffs.percent,
+      resistancePenetrationPct: buffs.penetration,
+    };
+    for (const enemy of [...this.state.enemies]) {
+      if (manhattan(origin, enemy.pos) > radius) continue;
+      if (spell.damagePercent > 0) {
+        this.applyDirectDamage(spell, enemy, modifiers, { skipOnHitPassives: true });
+      }
+      if (spell.zoneApplyStacks && enemy.hp > 0) {
+        this.fight.addStacks(enemy.id, spell.zoneApplyStacks.element, spell.zoneApplyStacks.count);
+        this.eventBus.emit({
+          type: "stacks",
+          targetId: enemy.id,
+          element: spell.zoneApplyStacks.element,
+          count: spell.zoneApplyStacks.count,
+          action: "apply",
+        });
+      }
+    }
   }
 
   /** Charge : déplacement en ligne droite puis attaque sur la cible. */
@@ -773,8 +862,13 @@ export class BoardScene extends Phaser.Scene {
       extraPercentBonus: buffs.percent,
       distanceBonusPercent: distanceBonus,
       executionBonus: spell.executionBonus,
+      resistancePenetrationPct: buffs.penetration,
     };
-    this.applyDirectDamage(spell, enemy, modifiers);
+    this.applyDirectDamage(spell, enemy, modifiers, {
+      lifestealBonusPct: buffs.lifestealBonus,
+      pmDrain: buffs.pmDrain,
+      applyStacks: buffs.applyStacks,
+    });
   }
 
   /** Sort ciblant un ennemi (cas général). */
@@ -792,13 +886,27 @@ export class BoardScene extends Phaser.Scene {
       flatBonus: buffs.flat,
       extraPercentBonus: buffs.percent,
       executionBonus: spell.executionBonus,
+      resistancePenetrationPct: buffs.penetration,
     };
 
-    this.applyDirectDamage(spell, enemy, modifiers);
+    // Sorts purement utilitaires (push d'arme Bois T1/T2) : damagePercent = 0 → on
+    // saute le calcul de dégâts pour ne pas planter le minimum 1.
+    if (spell.damagePercent > 0) {
+      this.applyDirectDamage(spell, enemy, modifiers, {
+        lifestealBonusPct: buffs.lifestealBonus,
+        pmDrain: buffs.pmDrain,
+        applyStacks: buffs.applyStacks,
+      });
+    }
 
-    // Push (Intimidation) — toujours après les dégâts, même si la cible est morte on skip
+    // Push (Intimidation, Bois arme) — toujours après les dégâts.
     if (spell.pushDistance && enemy.hp > 0) {
       this.pushEnemy(enemy, this.state.character.pos, spell.pushDistance);
+    }
+
+    // Pull (Bois Bottes) — inverse du push, rapproche la cible du joueur.
+    if (spell.pullDistance && enemy.hp > 0) {
+      this.pullEnemy(enemy, this.state.character.pos, spell.pullDistance);
     }
 
     // Applique les stacks (Entaille : 3 stacks de Poison)
@@ -818,7 +926,17 @@ export class BoardScene extends Phaser.Scene {
    * Applique les dégâts directs d'un sort sur un ennemi, gère PS, notification Rage,
    * déclenchement des stacks poison (trigger "on-hit"), popup + animation, mort.
    */
-  private applyDirectDamage(spell: Spell, enemy: EnemyState, modifiers: AttackModifiers): void {
+  private applyDirectDamage(
+    spell: Spell,
+    enemy: EnemyState,
+    modifiers: AttackModifiers,
+    extras: {
+      lifestealBonusPct?: number;
+      pmDrain?: number;
+      applyStacks?: { element: import("../data/elements").Element; count: number } | null;
+      skipOnHitPassives?: boolean;
+    } = {},
+  ): void {
     const { damage, killed } = computeDamage(
       this.state.character,
       enemy,
@@ -830,9 +948,36 @@ export class BoardScene extends Phaser.Scene {
     enemy.hp -= damage;
 
     // PS : +1 sur dégâts directs (1x / attaque)
-    if (damage > 0 && spell.damageType !== "indirect") {
+    const isDirectHit = damage > 0 && spell.damageType !== "indirect";
+    if (isDirectHit) {
       this.fight.addPS(1, "inflict");
       this.fight.notifyDirectDamageDealt();
+      if (!extras.skipOnHitPassives) {
+        // Arme Cuir : lifesteal sur les dégâts infligés (+ bonus Tête Cuir sur next attack)
+        this.applyWeaponLifesteal(damage, extras.lifestealBonusPct ?? 0);
+        // Arme Gemme : stacks Burn appliqués sur la cible (sauf si mort)
+        if (enemy.hp > 0) this.applyWeaponBurnOnHit(enemy);
+      }
+      // PM drain de la prochaine attaque (Tête Cuir T3+)
+      if (extras.pmDrain && extras.pmDrain > 0 && enemy.hp > 0) {
+        const before = enemy.moveRange;
+        enemy.moveRange = Math.max(0, before - extras.pmDrain);
+        this.eventBus.emit({
+          type: "info",
+          message: `${enemy.name} perd ${before - enemy.moveRange} PM (Tête Cuir).`,
+        });
+      }
+      // Stacks appliqués sur next attack (Tête Bois → Sang)
+      if (extras.applyStacks && enemy.hp > 0) {
+        this.fight.addStacks(enemy.id, extras.applyStacks.element, extras.applyStacks.count);
+        this.eventBus.emit({
+          type: "stacks",
+          targetId: enemy.id,
+          element: extras.applyStacks.element,
+          count: extras.applyStacks.count,
+          action: "apply",
+        });
+      }
     }
 
     this.eventBus.emit({
@@ -853,6 +998,108 @@ export class BoardScene extends Phaser.Scene {
     // Trigger Poison (terre) : "à chaque hit" — max 1 fois / événement, spec stacks.
     if (!killed && spell.damageType !== "indirect") {
       this.triggerPoisonOnHit(enemy);
+    }
+
+    if (enemy.hp <= 0) {
+      this.eventBus.emit({ type: "death", entityId: enemy.id });
+      this.fight.clearStacksFor(enemy.id);
+      this.killEnemy(enemy.id);
+    }
+  }
+
+  /** Arme Cuir : soigne le joueur d'un % des dégâts directs infligés (+ bonus Tête Cuir). */
+  private applyWeaponLifesteal(damageDealt: number, bonusPct = 0): void {
+    const pct = this.state.character.lifestealPct + bonusPct;
+    if (pct <= 0 || damageDealt <= 0) return;
+    const heal = Math.max(1, Math.floor((damageDealt * pct) / 100));
+    const before = this.state.character.hp;
+    const after = Math.min(this.state.character.maxHp, before + heal);
+    const gained = after - before;
+    if (gained <= 0) return;
+    this.state.character.hp = after;
+    const source = bonusPct > 0 ? "Cuir + Tête Cuir" : "arme Cuir";
+    this.eventBus.emit({ type: "info", message: `Lifesteal : +${gained} PV (${source})` });
+    const screen = gridToScreen(this.state.character.pos);
+    showDamagePopup(this, screen.x, screen.y - 10 * DPR, -gained);
+  }
+
+  /** Pull : déplace la cible vers l'attaquant sur N cases (inverse du push). */
+  private pullEnemy(enemy: EnemyState, target: GridPos, distance: number): void {
+    const dx = Math.sign(target.x - enemy.pos.x);
+    const dy = Math.sign(target.y - enemy.pos.y);
+    if ((dx !== 0 && dy !== 0) || (dx === 0 && dy === 0)) {
+      this.eventBus.emit({ type: "info", message: `${enemy.name} : pull annulé (non cardinal).` });
+      return;
+    }
+    let finalPos = { ...enemy.pos };
+    let pulled = 0;
+    for (let step = 1; step <= distance; step++) {
+      const next = { x: enemy.pos.x + dx * step, y: enemy.pos.y + dy * step };
+      if (next.x < 0 || next.x >= GRID_COLS || next.y < 0 || next.y >= GRID_ROWS) break;
+      if (this.state.tiles[next.y][next.x] === TileType.Obstacle) break;
+      if (this.state.enemies.some((e) => e.id !== enemy.id && e.pos.x === next.x && e.pos.y === next.y)) break;
+      if (this.state.character.pos.x === next.x && this.state.character.pos.y === next.y) break;
+      finalPos = next;
+      pulled = step;
+    }
+    if (pulled === 0) {
+      this.eventBus.emit({ type: "info", message: `${enemy.name} : pull bloqué.` });
+      return;
+    }
+    enemy.pos = finalPos;
+    const sprite = this.enemySprites.get(enemy.id);
+    if (sprite) {
+      const screen = gridToScreen(finalPos);
+      sprite.setPosition(screen.x, screen.y);
+    }
+    this.eventBus.emit({ type: "info", message: `${enemy.name} pulled de ${pulled} case(s).` });
+  }
+
+  /** Arme Gemme : applique des stacks Burn (Feu) sur la cible. */
+  private applyWeaponBurnOnHit(enemy: EnemyState): void {
+    const stacks = this.state.character.burnOnHitStacks;
+    if (stacks <= 0) return;
+    this.fight.addStacks(enemy.id, "feu", stacks);
+    this.eventBus.emit({
+      type: "stacks",
+      targetId: enemy.id,
+      element: "feu",
+      count: stacks,
+      action: "apply",
+    });
+  }
+
+  /**
+   * Tick Burn : au début du tour de l'ennemi, consomme ceil(stacks/2) et inflige
+   * 1 dégât par stack consommé (spec "🔥 Feu — Burn : 1 dégât / stack consommé").
+   */
+  private tickBurnStacks(enemy: EnemyState): void {
+    const stacks = this.state.targetStacks[enemy.id]?.feu ?? 0;
+    if (stacks <= 0) return;
+    const consumed = this.fight.consumeStacks(enemy.id, "feu");
+    if (consumed <= 0) return;
+    const burnDmg = Math.max(1, consumed);
+    enemy.hp = Math.max(0, enemy.hp - burnDmg);
+
+    this.eventBus.emit({
+      type: "damage",
+      attackerId: "player",
+      targetId: enemy.id,
+      damage: burnDmg,
+      spell: "Burn (Feu)",
+    });
+    this.eventBus.emit({
+      type: "stacks",
+      targetId: enemy.id,
+      element: "feu",
+      count: consumed,
+      action: "tick",
+    });
+
+    const sprite = this.enemySprites.get(enemy.id);
+    if (sprite) {
+      const screen = gridToScreen(enemy.pos);
+      showDamagePopup(this, screen.x, screen.y - 10 * DPR, burnDmg);
     }
 
     if (enemy.hp <= 0) {
@@ -1006,6 +1253,14 @@ export class BoardScene extends Phaser.Scene {
         turnNumber: this.state.turnNumber,
       });
 
+      // Tick Burn en début de tour (arme Gemme). Peut tuer l'ennemi avant qu'il agisse.
+      this.tickBurnStacks(enemy);
+      this.emitState();
+      if (enemy.hp <= 0) {
+        this.eventBus.emit({ type: "turnEnd", entityId: id });
+        continue;
+      }
+
       const moveDecision = decideEnemyMove(enemy, this.state);
       const pmUsed = moveDecision ? moveDecision.path.length : 0;
       if (moveDecision) {
@@ -1024,6 +1279,8 @@ export class BoardScene extends Phaser.Scene {
           {
             resistances: this.state.character.resistances,
             resistBuffPercent: this.state.character.resistBuffPercent,
+            flatResistancePct: this.state.character.flatResistancePct,
+            flatDamageReduction: this.state.character.flatDamageReduction,
           },
           spell,
           this.state.character.hp,

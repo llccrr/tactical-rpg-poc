@@ -1,17 +1,89 @@
 import type { Resistances } from "./elements";
+import type { Spell } from "../core/gameState";
+import type { ResourceType } from "./resources";
+import { RESOURCE_TYPES } from "./resources";
+import {
+  WEAPON_TIERS,
+  getWeaponDamage,
+  getWeaponName,
+  getWeaponItemId,
+  getWeaponEffectDescription,
+  getWeaponBonusSpell,
+  WEAPON_ICON_BY_TYPE,
+  WEAPON_RECIPE_BY_TIER,
+  CUIR_LIFESTEAL_BY_TIER,
+  GEMME_BURN_STACKS_BY_TIER,
+  type WeaponTier,
+} from "./weapons";
+import {
+  HELMET_ICON_BY_TYPE,
+  buildHelmetStatBonuses,
+  buildHelmetRecipe,
+  getHelmetItemId,
+  getHelmetName,
+  getHelmetEffectDescription,
+} from "./helmets";
+import {
+  CHEST_ICON_BY_TYPE,
+  buildChestStatBonuses,
+  buildChestRecipe,
+  getChestItemId,
+  getChestName,
+  getChestEffectDescription,
+} from "./chests";
+import {
+  BOOTS_ICON_BY_TYPE,
+  buildBootsStatBonuses,
+  buildBootsRecipe,
+  getBootsItemId,
+  getBootsName,
+  getBootsEffectDescription,
+} from "./boots";
+import { getPrimaryResource } from "./resources";
 
-export type ItemSlot = "arme" | "armure" | "accessoire";
+export type ItemSlot = "arme" | "tete" | "torse" | "bottes";
+
+export const ITEM_SLOTS: readonly ItemSlot[] = ["arme", "tete", "torse", "bottes"];
+
+export const ITEM_SLOT_LABELS: Record<ItemSlot, string> = {
+  arme: "Arme",
+  tete: "Tête",
+  torse: "Torse",
+  bottes: "Bottes",
+};
+
+export const ITEM_SLOT_EMPTY_ICONS: Record<ItemSlot, string> = {
+  arme: "⚔️",
+  tete: "⛑️",
+  torse: "🛡️",
+  bottes: "🥾",
+};
 
 export interface StatBonuses {
   attack?: number;
   hp?: number;
-  /** Bonus de r\u00e9sistance par \u00e9l\u00e9ment (additionn\u00e9 aux r\u00e9sistances de base). */
   resistances?: Partial<Resistances>;
+  weaponDamage?: number;
+  bonusSpells?: Spell[];
+  lifestealPct?: number;
+  burnOnHitStacks?: number;
+  flatDamageReduction?: number;
+  flatResistancePct?: number;
+  hpMaxPercentBonus?: number;
+  bonusMoveRange?: number;
+  psMaxBonus?: number;
+  psToPfCostOverride?: number;
+  firstDashesDiscount?: number;
 }
 
 export interface RecipeEntry {
   resourceId: string;
   qty: number;
+}
+
+export interface WeaponSpec {
+  resourceType: ResourceType;
+  tier: WeaponTier;
 }
 
 export interface ItemDef {
@@ -23,132 +95,117 @@ export interface ItemDef {
   bonuses: StatBonuses;
   recipe: RecipeEntry[];
   description: string;
+  /** Uniquement pour le slot arme : caractérise l'arme. */
+  weaponSpec?: WeaponSpec;
 }
 
+// ── Génération des 80 items ────────────────────────────────────
+
+function buildWeaponRecipe(resourceType: ResourceType, tier: WeaponTier): RecipeEntry[] {
+  const entries = WEAPON_RECIPE_BY_TIER[tier];
+  const recipe: RecipeEntry[] = [];
+  for (const e of entries) {
+    const resource = getPrimaryResource(resourceType, e.resourceTier);
+    if (!resource) continue;
+    recipe.push({ resourceId: resource.id, qty: e.qty });
+  }
+  return recipe;
+}
+
+function buildWeaponItem(resourceType: ResourceType, tier: WeaponTier): ItemDef {
+  const damage = getWeaponDamage(resourceType, tier);
+  const bonusSpell = getWeaponBonusSpell(resourceType, tier);
+  const bonuses: StatBonuses = { weaponDamage: damage };
+  if (bonusSpell) bonuses.bonusSpells = [bonusSpell];
+  if (resourceType === "cuir") bonuses.lifestealPct = CUIR_LIFESTEAL_BY_TIER[tier];
+  if (resourceType === "gemme") bonuses.burnOnHitStacks = GEMME_BURN_STACKS_BY_TIER[tier];
+
+  const effectLine = getWeaponEffectDescription(resourceType, tier);
+  return {
+    id: getWeaponItemId(resourceType, tier),
+    name: getWeaponName(resourceType, tier),
+    icon: WEAPON_ICON_BY_TYPE[resourceType],
+    slot: "arme",
+    tier,
+    bonuses,
+    recipe: buildWeaponRecipe(resourceType, tier),
+    description: `${damage} dégâts. ${effectLine}`,
+    weaponSpec: { resourceType, tier },
+  };
+}
+
+function buildHelmetItem(resourceType: ResourceType, tier: WeaponTier): ItemDef {
+  return {
+    id: getHelmetItemId(resourceType, tier),
+    name: getHelmetName(resourceType, tier),
+    icon: HELMET_ICON_BY_TYPE[resourceType],
+    slot: "tete",
+    tier,
+    bonuses: buildHelmetStatBonuses(resourceType, tier),
+    recipe: buildHelmetRecipe(resourceType, tier),
+    description: getHelmetEffectDescription(resourceType, tier),
+  };
+}
+
+function buildChestItem(resourceType: ResourceType, tier: WeaponTier): ItemDef {
+  return {
+    id: getChestItemId(resourceType, tier),
+    name: getChestName(resourceType, tier),
+    icon: CHEST_ICON_BY_TYPE[resourceType],
+    slot: "torse",
+    tier,
+    bonuses: buildChestStatBonuses(resourceType, tier),
+    recipe: buildChestRecipe(resourceType, tier),
+    description: getChestEffectDescription(resourceType, tier),
+  };
+}
+
+function buildBootsItem(resourceType: ResourceType, tier: WeaponTier): ItemDef {
+  return {
+    id: getBootsItemId(resourceType, tier),
+    name: getBootsName(resourceType, tier),
+    icon: BOOTS_ICON_BY_TYPE[resourceType],
+    slot: "bottes",
+    tier,
+    bonuses: buildBootsStatBonuses(resourceType, tier),
+    recipe: buildBootsRecipe(resourceType, tier),
+    description: getBootsEffectDescription(resourceType, tier),
+  };
+}
+
+const WEAPON_ITEMS: ItemDef[] = RESOURCE_TYPES.flatMap((type) =>
+  WEAPON_TIERS.map((tier) => buildWeaponItem(type, tier)),
+);
+const HELMET_ITEMS: ItemDef[] = RESOURCE_TYPES.flatMap((type) =>
+  WEAPON_TIERS.map((tier) => buildHelmetItem(type, tier)),
+);
+const CHEST_ITEMS: ItemDef[] = RESOURCE_TYPES.flatMap((type) =>
+  WEAPON_TIERS.map((tier) => buildChestItem(type, tier)),
+);
+const BOOTS_ITEMS: ItemDef[] = RESOURCE_TYPES.flatMap((type) =>
+  WEAPON_TIERS.map((tier) => buildBootsItem(type, tier)),
+);
+
 export const ITEMS: ItemDef[] = [
-  // \u2500\u2500 Armes \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  {
-    id: "lame_de_pierre",
-    name: "Lame de Pierre",
-    icon: "\u2694\ufe0f",
-    slot: "arme",
-    tier: 1,
-    bonuses: { attack: 3 },
-    recipe: [
-      { resourceId: "pierre_brute", qty: 2 },
-      { resourceId: "dent_gobelin", qty: 1 },
-    ],
-    description: "+3 Attaque",
-  },
-  {
-    id: "epee_maudite",
-    name: "\u00c9p\u00e9e Maudite",
-    icon: "\ud83d\udde1\ufe0f",
-    slot: "arme",
-    tier: 2,
-    bonuses: { attack: 6 },
-    recipe: [
-      { resourceId: "os_tranchant", qty: 2 },
-      { resourceId: "gemme_maudite", qty: 1 },
-    ],
-    description: "+6 Attaque",
-  },
-  // \u2500\u2500 Armures \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  {
-    id: "cape_de_spores",
-    name: "Cape de Spores",
-    icon: "\ud83d\udee1\ufe0f",
-    slot: "armure",
-    tier: 1,
-    bonuses: { resistances: { terre: 0.1, neutre: 0.05 } },
-    recipe: [
-      { resourceId: "champignon_toxique", qty: 2 },
-      { resourceId: "pierre_brute", qty: 1 },
-    ],
-    description: "+10% Res Terre, +5% Res Neutre",
-  },
-  {
-    id: "armure_osseuse",
-    name: "Armure Osseuse",
-    icon: "\ud83e\uddb4",
-    slot: "armure",
-    tier: 2,
-    bonuses: { hp: 5, resistances: { neutre: 0.15, terre: 0.1 } },
-    recipe: [
-      { resourceId: "poussiere_os", qty: 2 },
-      { resourceId: "os_tranchant", qty: 1 },
-    ],
-    description: "+5 PV, +15% Res Neutre, +10% Res Terre",
-  },
-  // \u2500\u2500 Accessoires \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  {
-    id: "dent_porte_bonheur",
-    name: "Dent Porte-Bonheur",
-    icon: "\ud83e\uddb7",
-    slot: "accessoire",
-    tier: 1,
-    bonuses: { hp: 8 },
-    recipe: [
-      { resourceId: "dent_gobelin", qty: 2 },
-      { resourceId: "champignon_toxique", qty: 1 },
-    ],
-    description: "+8 PV max",
-  },
-  {
-    id: "noyau_energetique",
-    name: "Noyau \u00c9nerg\u00e9tique",
-    icon: "\u26a1",
-    slot: "accessoire",
-    tier: 2,
-    bonuses: { attack: 2, hp: 5, resistances: { neutre: 0.1 } },
-    recipe: [
-      { resourceId: "noyau_slime", qty: 1 },
-      { resourceId: "cristal_visqueux", qty: 2 },
-    ],
-    description: "+2 Attaque, +5 PV, +10% Res Neutre",
-  },
-  // \u2500\u2500 Tier 3 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-  {
-    id: "lame_demoniaque",
-    name: "Lame D\u00e9moniaque",
-    icon: "\ud83d\udd25",
-    slot: "arme",
-    tier: 3,
-    bonuses: { attack: 10 },
-    recipe: [
-      { resourceId: "corne_demon", qty: 2 },
-      { resourceId: "flamme_infernale", qty: 1 },
-    ],
-    description: "+10 Attaque",
-  },
-  {
-    id: "cuirasse_infernale",
-    name: "Cuirasse Infernale",
-    icon: "\ud83d\udee1\ufe0f",
-    slot: "armure",
-    tier: 3,
-    bonuses: { hp: 10, resistances: { feu: 0.3, neutre: 0.15 } },
-    recipe: [
-      { resourceId: "flamme_infernale", qty: 2 },
-      { resourceId: "coeur_demon", qty: 1 },
-    ],
-    description: "+10 PV, +30% Res Feu, +15% Res Neutre",
-  },
-  {
-    id: "pendentif_demon",
-    name: "Pendentif du D\u00e9mon",
-    icon: "\ud83d\udd2e",
-    slot: "accessoire",
-    tier: 3,
-    bonuses: { attack: 4, hp: 8, resistances: { feu: 0.15, neutre: 0.1 } },
-    recipe: [
-      { resourceId: "coeur_demon", qty: 1 },
-      { resourceId: "corne_demon", qty: 2 },
-    ],
-    description: "+4 Attaque, +8 PV, +15% Res Feu, +10% Res Neutre",
-  },
+  ...WEAPON_ITEMS,
+  ...HELMET_ITEMS,
+  ...CHEST_ITEMS,
+  ...BOOTS_ITEMS,
 ];
 
 export function getItemById(id: string): ItemDef | undefined {
   return ITEMS.find((i) => i.id === id);
+}
+
+export function getItemsBySlot(slot: ItemSlot): ItemDef[] {
+  switch (slot) {
+    case "arme": return WEAPON_ITEMS;
+    case "tete": return HELMET_ITEMS;
+    case "torse": return CHEST_ITEMS;
+    case "bottes": return BOOTS_ITEMS;
+  }
+}
+
+export function getWeaponItems(): ItemDef[] {
+  return WEAPON_ITEMS;
 }

@@ -30,8 +30,9 @@ const TIER_COLORS: Record<number, string> = {
 
 const SLOT_ORDER: { slot: ItemSlot; label: string; emptyIcon: string }[] = [
   { slot: "arme", label: "Arme", emptyIcon: "\u2694\uFE0F" },
-  { slot: "armure", label: "Armure", emptyIcon: "\uD83D\uDEE1\uFE0F" },
-  { slot: "accessoire", label: "Accessoire", emptyIcon: "\uD83D\uDC8D" },
+  { slot: "tete", label: "T\u00eate", emptyIcon: "\u26d1\uFE0F" },
+  { slot: "torse", label: "Torse", emptyIcon: "\uD83D\uDEE1\uFE0F" },
+  { slot: "bottes", label: "Bottes", emptyIcon: "\uD83E\uDD7E" },
 ];
 
 /* ── Sidebar components ──────────────────────────────────── */
@@ -789,7 +790,7 @@ export function Hub({ player, completedDungeons, onPlayerChange, onStartDungeon,
             onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
             onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.5")}
           >
-            +3 ressources (cheat)
+            +10 de chaque ressource (cheat)
           </button>
         </div>
       </div>
